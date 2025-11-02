@@ -1,0 +1,31 @@
+{
+  "name": "horizontrader",
+  "version": "1.0.0",
+  "description": "Technical Analysis Portfolio Management System",
+  "main": "src/api/server.js",
+  "scripts": {
+    "start": "node src/api/server.js",
+    "test": "jasmine",
+    "test:watch": "jasmine --watch",
+    "test:integration": "jasmine spec/integration"
+  },
+  "keywords": [
+    "trading",
+    "portfolio",
+    "technical-analysis",
+    "backtesting"
+  ],
+  "author": "Nithik Pandya, Ayush Dodia, Vraj Shah",
+  "license": "MIT",
+  "dependencies": {
+    "mongoose": "^8.19.2",
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "jasmine": "^4.6.0",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
