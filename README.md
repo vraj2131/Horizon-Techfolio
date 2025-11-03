@@ -154,32 +154,35 @@ npm run test:watch
 - [x] Basic API endpoints
 - [x] Caching and rate limiting
 
-### Phase 2: Technical Indicators (In Progress)
-- [ ] SMA, EMA, RSI, MACD, Bollinger Bands
-- [ ] Signal generation logic
-- [ ] Indicator service implementation
+### Phase 2: Technical Indicators ✅
+- [x] SMA, EMA, RSI, MACD, Bollinger Bands
+- [x] Signal generation logic
+- [x] Indicator service implementation
 
-### Phase 3: Strategy Engine (Planned)
-- [ ] 4 pre-built strategies
-- [ ] Trading frequency recommendations
-- [ ] Strategy service implementation
+### Phase 3: Strategy Engine ✅
+- [x] 4 pre-built strategies
+- [x] Trading frequency recommendations
+- [x] Strategy service implementation
 
-### Phase 4: Portfolio Management (Planned)
-- [ ] Position tracking
-- [ ] Rebalancing logic
-- [ ] Performance metrics
+### Phase 4: Portfolio Management ✅
+- [x] Position tracking
+- [x] Rebalancing logic
+- [x] Performance metrics
 
-### Phase 5: Backtesting (Planned)
-- [ ] Historical simulation
+### Phase 5: Backtesting 🟡 (Partially Complete)
+- [x] API endpoint (`POST /backtest`)
+- [ ] Historical simulation engine
 - [ ] Performance metrics (CAGR, Sharpe, Drawdown)
 - [ ] Cost modeling
 
-### Phase 6: Paper Trading (Planned)
+### Phase 6: Paper Trading 🟡 (Partially Complete)
+- [x] API endpoint (`GET /portfolio/:id/paper-trading`)
 - [ ] Real-time validation
 - [ ] Performance tracking
 - [ ] Deviation alerts
 
-### Phase 7: Coupled Trades (Planned)
+### Phase 7: Coupled Trades 🟡 (Partially Complete)
+- [x] API endpoint (`POST /coupled-trade`)
 - [ ] Pairs trading
 - [ ] Beta hedging
 - [ ] Risk management
@@ -204,6 +207,7 @@ This project uses AI assistance for code generation. All AI-generated code is re
 - AI sometimes generates Express code despite pure Node.js requirement
 - Indicator calculations may have look-ahead bias without proper validation
 - API error handling needs manual review for completeness
+
 
 
 

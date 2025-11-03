@@ -3,16 +3,45 @@
  * Alpha Vantage API configuration and application settings
  */
 
+// Get API keys from environment variables
+const getApiKeys = () => {
+  const keys = [];
+  
+  // Primary key (required)
+  if (process.env.ALPHA_VANTAGE_API_KEY) {
+    keys.push(process.env.ALPHA_VANTAGE_API_KEY);
+  }
+  
+  // Secondary key (optional)
+  if (process.env.ALPHA_VANTAGE_API_KEY_2) {
+    keys.push(process.env.ALPHA_VANTAGE_API_KEY_2);
+  }
+  
+  // Tertiary key (optional)
+  if (process.env.ALPHA_VANTAGE_API_KEY_3) {
+    keys.push(process.env.ALPHA_VANTAGE_API_KEY_3);
+  }
+  
+  // Fallback to demo key if no keys provided (for testing only)
+  if (keys.length === 0) {
+    keys.push('MN2S749NU20S4XMU');
+  }
+  
+  return keys;
+};
+
 module.exports = {
   // Alpha Vantage API Configuration
   alphaVantage: {
-    apiKey: process.env.ALPHA_VANTAGE_API_KEY || 'MN2S749NU20S4XMU', // Use demo key for testing
+    apiKeys: getApiKeys(), // Array of API keys for rotation
+    apiKey: getApiKeys()[0], // Primary key (backward compatibility)
     baseUrl: 'https://www.alphavantage.co/query',
     rateLimit: {
       callsPerMinute: 5, // Free tier limit
       callsPerDay: 500,  // Free tier limit
       retryAfter: 60000  // 1 minute retry delay
-    }
+    },
+    enableKeyRotation: process.env.ENABLE_KEY_ROTATION !== 'false' // Enable by default
   },
 
   // Application Settings
@@ -48,8 +77,18 @@ module.exports = {
   paperTrading: {
     updateInterval: 5 * 60 * 1000, // 5 minutes
     maxDeviation: 0.10 // 10% performance deviation alert
+  },
+
+  // Database Configuration
+  database: {
+    mongoURI: process.env.MONGODB_URI || 'mongodb://localhost:27017/horizontrader',
+    required: process.env.DB_REQUIRED !== 'true', // Set to true to require DB, false to make it optional
+    options: {
+      // Modern MongoDB driver options (useNewUrlParser and useUnifiedTopology are deprecated)
+    }
   }
 };
+
 
 
 

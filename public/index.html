@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HorizonTrader - Portfolio Management</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>📊 HorizonTrader</h1>
+            <p class="subtitle">Technical Analysis Portfolio Management</p>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <button class="nav-btn active" onclick="showSection('dashboard')">Dashboard</button>
+            <button class="nav-btn" onclick="showSection('create-user')">Create User</button>
+            <button class="nav-btn" onclick="showSection('portfolio')">Portfolio</button>
+            <button class="nav-btn" onclick="showSection('search-stocks')">Search Stocks</button>
+            <button class="nav-btn" onclick="showSection('backtest')">Backtest</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="content-section active">
+            <h2>Dashboard</h2>
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>User Information</h3>
+                    <div id="user-info">
+                        <p>No user loaded. Create a user to get started.</p>
+                    </div>
+                    <button onclick="showSection('create-user')">Create User</button>
+                </div>
+
+                <div class="card">
+                    <h3>My Portfolios</h3>
+                    <div id="portfolios-list">
+                        <p>Loading portfolios...</p>
+                    </div>
+                    <button onclick="showSection('portfolio')">Create Portfolio</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Create User Section -->
+        <section id="create-user" class="content-section">
+            <h2>Create User</h2>
+            <form id="create-user-form" class="form">
+                <div class="form-group">
+                    <label for="user-id">User ID*</label>
+                    <input type="text" id="user-id" required placeholder="e.g., user123">
+                </div>
+                <div class="form-group">
+                    <label for="user-name">Name*</label>
+                    <input type="text" id="user-name" required placeholder="John Doe">
+                </div>
+                <div class="form-group">
+                    <label for="user-email">Email (optional)</label>
+                    <input type="email" id="user-email" placeholder="john@example.com">
+                </div>
+                <button type="submit">Create User</button>
+            </form>
+            <div id="user-result" class="result"></div>
+        </section>
+
+        <!-- Portfolio Section -->
+        <section id="portfolio" class="content-section">
+            <h2>Create Portfolio</h2>
+            <form id="portfolio-form" class="form">
+                <div class="form-group">
+                    <label for="portfolio-user-id">User ID*</label>
+                    <input type="text" id="portfolio-user-id" required placeholder="Enter your user ID">
+                </div>
+                <div class="form-group">
+                    <label for="tickers">Stock Tickers* (comma-separated, max 20)</label>
+                    <textarea id="tickers" required placeholder="AAPL, MSFT, GOOGL, AMZN" rows="3"></textarea>
+                    <small>Enter stock symbols separated by commas</small>
+                </div>
+                <div class="form-group">
+                    <label for="horizon">Investment Horizon*</label>
+                    <select id="horizon" required>
+                        <option value="">Select horizon</option>
+                        <option value="1">1 Year</option>
+                        <option value="2">2 Years</option>
+                        <option value="5">5 Years</option>
+                    </select>
+                </div>
+                <button type="submit">Create Portfolio</button>
+            </form>
+            <div id="portfolio-result" class="result"></div>
+
+            <!-- Portfolio Management -->
+            <div id="portfolio-management" style="display: none;">
+                <h3>Portfolio Management</h3>
+                <div class="portfolio-tabs">
+                    <button class="tab-btn active" onclick="showPortfolioTab('signals')">Signals</button>
+                    <button class="tab-btn" onclick="showPortfolioTab('strategy')">Strategy</button>
+                    <button class="tab-btn" onclick="showPortfolioTab('performance')">Performance</button>
+                    <button class="tab-btn" onclick="showPortfolioTab('paper-trading')">Paper Trading</button>
+                </div>
+
+                <div id="signals-tab" class="portfolio-tab-content active">
+                    <h4>Buy/Hold/Sell Signals</h4>
+                    <div id="signals-content"></div>
+                </div>
+
+                <div id="strategy-tab" class="portfolio-tab-content">
+                    <h4>Recommended Strategy</h4>
+                    <div id="strategy-content"></div>
+                </div>
+
+                <div id="performance-tab" class="portfolio-tab-content">
+                    <h4>Performance Metrics</h4>
+                    <div id="performance-content"></div>
+                </div>
+
+                <div id="paper-trading-tab" class="portfolio-tab-content">
+                    <h4>Paper Trading Status</h4>
+                    <div id="paper-trading-content"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search Stocks Section -->
+        <section id="search-stocks" class="content-section">
+            <h2>Search & Validate Stocks</h2>
+            <form id="search-stocks-form" class="form">
+                <div class="form-group">
+                    <label for="stock-symbols">Stock Symbols (comma-separated, max 50)</label>
+                    <textarea id="stock-symbols" required placeholder="AAPL, MSFT, GOOGL, TSLA, NVDA" rows="3"></textarea>
+                    <small>Enter stock symbols to validate</small>
+                </div>
+                <button type="submit">Search Stocks</button>
+            </form>
+            <div id="stocks-result" class="result"></div>
+        </section>
+
+        <!-- Backtest Section -->
+        <section id="backtest" class="content-section">
+            <h2>Backtest Strategy</h2>
+            <form id="backtest-form" class="form">
+                <div class="form-group">
+                    <label for="backtest-portfolio-id">Portfolio ID*</label>
+                    <input type="text" id="backtest-portfolio-id" required placeholder="portfolio_1234567890">
+                </div>
+                <div class="form-group">
+                    <label for="backtest-start-date">Start Date*</label>
+                    <input type="date" id="backtest-start-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="backtest-end-date">End Date*</label>
+                    <input type="date" id="backtest-end-date" required>
+                </div>
+                <button type="submit">Run Backtest</button>
+            </form>
+            <div id="backtest-result" class="result"></div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 HorizonTrader - Technical Analysis Portfolio Management</p>
+            <p>Team: Nithik Pandya, Ayush Dodia, Vraj Shah</p>
+        </div>
+    </footer>
+
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+

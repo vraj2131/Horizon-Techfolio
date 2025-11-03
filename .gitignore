@@ -30,6 +30,7 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
@@ -49,4 +50,11 @@ build/
 tmp/
 temp/
 *.tmp
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+mongodb-data/
 

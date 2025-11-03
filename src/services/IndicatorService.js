@@ -58,9 +58,10 @@ class EMAIndicator extends TechnicalIndicator {
   calculateSignal(priceData, values, index) {
     if (index < 1) return 'hold';
     
-    const currentPrice = priceData[index + this.window - 1].close;
+    // EMA values align directly with priceData (same length, starts at index 0)
+    const currentPrice = priceData[index].close;
     const currentEMA = values[index];
-    const previousPrice = priceData[index + this.window - 2].close;
+    const previousPrice = priceData[index - 1].close;
     const previousEMA = values[index - 1];
     
     // Price crossing above EMA = buy signal

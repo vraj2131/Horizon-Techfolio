@@ -7,7 +7,8 @@
     "start": "node src/api/server.js",
     "test": "jasmine",
     "test:watch": "jasmine --watch",
-    "test:integration": "jasmine spec/integration"
+    "test:integration": "jasmine spec/integration",
+    "update-prices": "node scripts/daily-update.js"
   },
   "keywords": [
     "trading",
@@ -18,6 +19,7 @@
   "author": "Nithik Pandya, Ayush Dodia, Vraj Shah",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "mongoose": "^8.19.2",
     "node-fetch": "^2.6.7"
   },

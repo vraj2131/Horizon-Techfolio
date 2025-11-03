@@ -10,16 +10,88 @@ const config = require('../../config/config');
 
 class MarketDataProvider {
   constructor() {
-    this.apiKey = config.alphaVantage.apiKey;
+    this.apiKeys = config.alphaVantage.apiKeys || [config.alphaVantage.apiKey];
+    this.currentKeyIndex = 0;
     this.baseUrl = config.alphaVantage.baseUrl;
     this.rateLimit = config.alphaVantage.rateLimit;
-    this.callCount = 0;
-    this.lastCallTime = 0;
+    this.enableKeyRotation = config.alphaVantage.enableKeyRotation !== false;
+    
+    // Track call counts per key
+    this.keyStats = {};
+    this.apiKeys.forEach((key, index) => {
+      this.keyStats[index] = {
+        callCount: 0,
+        lastCallTime: 0,
+        rateLimitedUntil: 0 // Timestamp when rate limit expires
+      };
+    });
+    
     this.cache = new Map();
     this.cacheDir = config.cache.cacheDir;
     
     // Ensure cache directory exists
     this.ensureCacheDir();
+    
+    console.log(`📊 MarketDataProvider initialized with ${this.apiKeys.length} API key(s)`);
+    if (this.apiKeys.length > 1 && this.enableKeyRotation) {
+      console.log('🔄 API key rotation enabled');
+    }
+  }
+  
+  /**
+   * Get current active API key
+   */
+  getCurrentApiKey() {
+    return this.apiKeys[this.currentKeyIndex];
+  }
+  
+  /**
+   * Check if current key is rate limited
+   */
+  isKeyRateLimited(keyIndex) {
+    const stats = this.keyStats[keyIndex];
+    return stats && Date.now() < stats.rateLimitedUntil;
+  }
+  
+  /**
+   * Mark a key as rate limited
+   */
+  markKeyRateLimited(keyIndex) {
+    if (this.keyStats[keyIndex]) {
+      // Rate limit typically lasts 1 minute, but we'll set it to 2 minutes for safety
+      this.keyStats[keyIndex].rateLimitedUntil = Date.now() + (2 * 60 * 1000);
+      console.log(`⚠️  API key ${keyIndex + 1} marked as rate limited. Will retry after ${new Date(this.keyStats[keyIndex].rateLimitedUntil).toLocaleTimeString()}`);
+    }
+  }
+  
+  /**
+   * Switch to next available API key
+   */
+  switchToNextKey() {
+    if (!this.enableKeyRotation || this.apiKeys.length <= 1) {
+      return false;
+    }
+    
+    const originalIndex = this.currentKeyIndex;
+    let attempts = 0;
+    
+    // Try to find a non-rate-limited key
+    while (attempts < this.apiKeys.length) {
+      this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+      attempts++;
+      
+      if (!this.isKeyRateLimited(this.currentKeyIndex)) {
+        if (originalIndex !== this.currentKeyIndex) {
+          console.log(`🔄 Switched to API key ${this.currentKeyIndex + 1} (attempted ${attempts} key(s))`);
+        }
+        return true;
+      }
+    }
+    
+    // All keys are rate limited, reset current index
+    this.currentKeyIndex = originalIndex;
+    console.log(`⚠️  All API keys are rate limited. Waiting for cooldown...`);
+    return false;
   }
 
   async ensureCacheDir() {
@@ -32,25 +104,47 @@ class MarketDataProvider {
 
   /**
    * Rate limiting to respect Alpha Vantage free tier limits
+   * Tracks per-key rate limits
    */
   async checkRateLimit() {
     const now = Date.now();
+    const stats = this.keyStats[this.currentKeyIndex];
+    
+    if (!stats) return;
     
     // Reset call count if more than a minute has passed
-    if (now - this.lastCallTime > 60000) {
-      this.callCount = 0;
+    if (now - stats.lastCallTime > 60000) {
+      stats.callCount = 0;
     }
     
-    // Check if we've exceeded the rate limit
-    if (this.callCount >= this.rateLimit.callsPerMinute) {
-      const waitTime = 60000 - (now - this.lastCallTime);
-      console.log(`Rate limit reached. Waiting ${waitTime}ms...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-      this.callCount = 0;
+    // Check if current key is rate limited
+    if (this.isKeyRateLimited(this.currentKeyIndex)) {
+      // Try to switch to another key
+      if (this.switchToNextKey()) {
+        // Switched to a new key, check its rate limit
+        return this.checkRateLimit();
+      } else {
+        // All keys rate limited, wait for cooldown
+        const waitTime = Math.max(0, stats.rateLimitedUntil - now);
+        if (waitTime > 0) {
+          console.log(`⏳ All keys rate limited. Waiting ${Math.ceil(waitTime / 1000)}s...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime + 1000));
+        }
+      }
     }
     
-    this.callCount++;
-    this.lastCallTime = now;
+    // Check if we've exceeded the per-minute rate limit for current key
+    if (stats.callCount >= this.rateLimit.callsPerMinute) {
+      const waitTime = 60000 - (now - stats.lastCallTime);
+      if (waitTime > 0) {
+        console.log(`Rate limit approaching for key ${this.currentKeyIndex + 1}. Waiting ${Math.ceil(waitTime / 1000)}s...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        stats.callCount = 0;
+      }
+    }
+    
+    stats.callCount++;
+    stats.lastCallTime = now;
   }
 
   /**
@@ -99,19 +193,21 @@ class MarketDataProvider {
   }
 
   /**
-   * Make API call to Alpha Vantage with error handling
+   * Make API call to Alpha Vantage with error handling and automatic key rotation
    */
-  async makeApiCall(params) {
+  async makeApiCall(params, retryCount = 0) {
     await this.checkRateLimit();
     
+    const apiKey = this.getCurrentApiKey();
     const url = new URL(this.baseUrl);
     Object.keys(params).forEach(key => {
       url.searchParams.append(key, params[key]);
     });
-    url.searchParams.append('apikey', this.apiKey);
+    url.searchParams.append('apikey', apiKey);
 
     try {
-      console.log(`Making API call: ${url.toString()}`);
+      // Don't log full URL (contains API key)
+      console.log(`📡 API call using key ${this.currentKeyIndex + 1}: ${params.function} for ${params.symbol || 'N/A'}`);
       const response = await fetch(url.toString());
       
       if (!response.ok) {
@@ -125,13 +221,45 @@ class MarketDataProvider {
         throw new Error(`API Error: ${data['Error Message']}`);
       }
       
+      // Check for rate limit notice (this is how Alpha Vantage indicates rate limiting)
       if (data['Note']) {
-        throw new Error(`API Note: ${data['Note']}`);
+        const note = data['Note'];
+        // Check if it's a rate limit message
+        if (note.toLowerCase().includes('call frequency') || 
+            note.toLowerCase().includes('api call volume') ||
+            note.toLowerCase().includes('thank you for using alpha vantage')) {
+          
+          console.log(`⛔ Rate limit detected for key ${this.currentKeyIndex + 1}: ${note}`);
+          this.markKeyRateLimited(this.currentKeyIndex);
+          
+          // Try to switch to another key and retry
+          if (this.enableKeyRotation && this.apiKeys.length > 1 && retryCount < this.apiKeys.length) {
+            if (this.switchToNextKey()) {
+              console.log(`🔄 Retrying with different API key...`);
+              return this.makeApiCall(params, retryCount + 1);
+            }
+          }
+          
+          throw new Error(`Rate limit reached. ${note}`);
+        }
+        throw new Error(`API Note: ${note}`);
       }
       
       return data;
     } catch (error) {
-      console.error('API call failed:', error.message);
+      // If it's a rate limit error and we haven't exhausted retries, try next key
+      if (error.message.includes('Rate limit') && 
+          this.enableKeyRotation && 
+          this.apiKeys.length > 1 && 
+          retryCount < this.apiKeys.length) {
+        
+        if (this.switchToNextKey()) {
+          console.log(`🔄 Retrying with different API key due to: ${error.message}`);
+          return this.makeApiCall(params, retryCount + 1);
+        }
+      }
+      
+      console.error(`❌ API call failed (key ${this.currentKeyIndex + 1}):`, error.message);
       throw error;
     }
   }

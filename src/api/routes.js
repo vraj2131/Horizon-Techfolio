@@ -7,21 +7,33 @@ const Security = require('../models/Security');
 const Portfolio = require('../models/Portfolio');
 const Strategy = require('../models/Strategy');
 const StrategyService = require('../services/StrategyService');
+const DBService = require('../db/dbService');
+const PriceDataService = require('../services/PriceDataService');
+const dailyUpdateService = require('../services/DailyUpdateService');
 // Note: BacktestSession, CoupledTrade, and PaperTradingService will be implemented in later phases
 
-// In-memory storage for demo purposes
-const portfolios = new Map();
-const backtestSessions = new Map();
-const paperTradingSessions = new Map();
 const strategyService = new StrategyService();
+const priceDataService = new PriceDataService();
 
 /**
  * Initialize a new portfolio with tickers and horizon
  * POST /portfolio/initialize
+ * Body: { tickers: [], horizon: 1|2|5, userId: string } - userId is REQUIRED and must exist in database
  */
 async function initializePortfolio(body) {
   try {
-    const { tickers, horizon } = body;
+    const { tickers, horizon, userId } = body;
+    
+    // Validate userId is provided
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      throw new Error('userId is required and must be a valid string');
+    }
+
+    // Validate userId exists in database
+    const user = await DBService.getUser(userId);
+    if (!user) {
+      throw new Error(`User with userId "${userId}" not found. Please create the user first using POST /user`);
+    }
     
     if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
       throw new Error('Tickers array is required');
@@ -35,7 +47,7 @@ async function initializePortfolio(body) {
       throw new Error('Maximum 20 tickers allowed');
     }
 
-    console.log(`Initializing portfolio with ${tickers.length} tickers for ${horizon}-year horizon`);
+    console.log(`Initializing portfolio for user ${userId} with ${tickers.length} tickers for ${horizon}-year horizon`);
 
     // Validate all tickers
     const securities = [];
@@ -63,19 +75,26 @@ async function initializePortfolio(body) {
       throw new Error('No valid tickers found');
     }
 
-    // Create portfolio
+    // Initialize price data for all valid tickers (background, non-blocking)
+    const tickerSymbols = validSecurities.map(s => s.ticker);
+    dailyUpdateService.initializeTickers(tickerSymbols).catch(err => {
+      console.warn('Background data initialization error (non-critical):', err.message);
+    });
+
+    // Create portfolio with validated userId
     const portfolio = new Portfolio(validSecurities, parseInt(horizon));
     const portfolioId = `portfolio_${Date.now()}`;
-    portfolios.set(portfolioId, portfolio);
+    await DBService.savePortfolio(portfolioId, portfolio, userId);
 
     console.log(`Portfolio ${portfolioId} created with ${validSecurities.length} valid securities`);
 
     return {
       portfolioId,
+      userId: userId,
       horizon: parseInt(horizon),
       securities: validSecurities.map(s => s.get_metadata()),
       validationResults,
-      message: `Portfolio initialized with ${validSecurities.length} valid securities`
+      message: `Portfolio initialized with ${validSecurities.length} valid securities for user ${userId}`
     };
   } catch (error) {
     console.error('Portfolio initialization error:', error.message);
@@ -89,7 +108,7 @@ async function initializePortfolio(body) {
  */
 async function getPortfolioSignals(portfolioId) {
   try {
-    const portfolio = portfolios.get(portfolioId);
+    const portfolio = await DBService.getPortfolio(portfolioId);
     if (!portfolio) {
       throw new Error('Portfolio not found');
     }
@@ -105,14 +124,25 @@ async function getPortfolioSignals(portfolioId) {
     
     const strategy = recommendation.strategyObject;
     
-    // Fetch current price data for all securities
+    // Fetch current price data for all securities (using PriceDataService for efficient caching)
     const priceDataMap = new Map();
+    const today = new Date();
+    const endDate = today.toISOString().split('T')[0];
+    const startDate = new Date(today);
+    startDate.setFullYear(startDate.getFullYear() - 1); // Get last year of data for indicators
+    const startDateStr = startDate.toISOString().split('T')[0];
+    
     for (const ticker of portfolio.getTickers()) {
       const position = portfolio.getPosition(ticker);
       if (position) {
         try {
-          const priceData = await position.security.fetch_history('2024-10-01', '2024-10-28');
-          priceDataMap.set(ticker, priceData);
+          // Use PriceDataService which checks DB first, then cache, then API
+          const priceData = await priceDataService.getPriceData(ticker, startDateStr, endDate, 'daily');
+          if (priceData && priceData.length > 0) {
+            priceDataMap.set(ticker, priceData);
+          } else {
+            console.warn(`No price data available for ${ticker}`);
+          }
         } catch (error) {
           console.warn(`Failed to fetch data for ${ticker}:`, error.message);
         }
@@ -140,7 +170,7 @@ async function getPortfolioSignals(portfolioId) {
  */
 async function getPortfolioStrategy(portfolioId) {
   try {
-    const portfolio = portfolios.get(portfolioId);
+    const portfolio = await DBService.getPortfolio(portfolioId);
     if (!portfolio) {
       throw new Error('Portfolio not found');
     }
@@ -187,7 +217,7 @@ async function runBacktest(body) {
       throw new Error('Portfolio ID is required');
     }
 
-    const portfolio = portfolios.get(portfolioId);
+    const portfolio = await DBService.getPortfolio(portfolioId);
     if (!portfolio) {
       throw new Error('Portfolio not found');
     }
@@ -197,11 +227,17 @@ async function runBacktest(body) {
     // This will be implemented in Phase 5 (Backtesting)
     // For now, return a placeholder
     const sessionId = `backtest_${Date.now()}`;
-    backtestSessions.set(sessionId, {
+    await DBService.saveBacktestSession(sessionId, {
       portfolioId,
       startDate: startDate || '2020-01-01',
       endDate: endDate || '2023-12-31',
-      status: 'completed'
+      status: 'completed',
+      metrics: {
+        cagr: 0.12,
+        sharpe: 1.2,
+        maxDrawdown: -0.15,
+        totalReturn: 0.36
+      }
     });
 
     return {
@@ -232,7 +268,7 @@ async function runBacktest(body) {
  */
 async function getPaperTradingStatus(portfolioId) {
   try {
-    const portfolio = portfolios.get(portfolioId);
+    const portfolio = await DBService.getPortfolio(portfolioId);
     if (!portfolio) {
       throw new Error('Portfolio not found');
     }
@@ -240,8 +276,12 @@ async function getPaperTradingStatus(portfolioId) {
     console.log(`Getting paper trading status for portfolio ${portfolioId}`);
     
     // This will be implemented in Phase 6 (Paper Trading)
-    // For now, return a placeholder
-    return {
+    // Try to get existing session or return placeholder
+    let session = await DBService.getPaperTradingSession(portfolioId);
+    
+    if (!session) {
+      // Return placeholder if no session exists
+      return {
       portfolioId,
       status: 'active',
       paperTrades: [],
@@ -251,6 +291,20 @@ async function getPaperTradingStatus(portfolioId) {
         dailyReturn: 0.0
       },
       message: 'Paper trading will be implemented in Phase 6 - placeholder response',
+      timestamp: new Date().toISOString()
+      };
+    }
+    
+    // Return actual session data
+    return {
+      portfolioId: session.portfolioId,
+      status: session.status,
+      paperTrades: session.paperTrades || [],
+      performance: session.performance || {
+        currentValue: session.currentValue || 100000,
+        totalReturn: session.totalReturn || 0.0,
+        dailyReturn: session.dailyReturn || 0.0
+      },
       timestamp: new Date().toISOString()
     };
   } catch (error) {
@@ -271,7 +325,7 @@ async function generateCoupledTrade(body) {
       throw new Error('Portfolio ID is required');
     }
 
-    const portfolio = portfolios.get(portfolioId);
+    const portfolio = await DBService.getPortfolio(portfolioId);
     if (!portfolio) {
       throw new Error('Portfolio not found');
     }
@@ -301,7 +355,7 @@ async function generateCoupledTrade(body) {
  */
 async function getPortfolioPerformance(portfolioId) {
   try {
-    const portfolio = portfolios.get(portfolioId);
+    const portfolio = await DBService.getPortfolio(portfolioId);
     if (!portfolio) {
       throw new Error('Portfolio not found');
     }
@@ -338,6 +392,203 @@ async function getPortfolioPerformance(portfolioId) {
   }
 }
 
+/**
+ * Create or update a user
+ * POST /user
+ * Body: { userId: string, name: string, email?: string }
+ */
+async function createUser(body) {
+  try {
+    const { userId, name, email } = body;
+    
+    if (!userId || !name) {
+      throw new Error('userId and name are required');
+    }
+
+    await DBService.saveUser(userId, name, email || null);
+    
+    return {
+      userId,
+      name,
+      email: email || null,
+      message: 'User created successfully'
+    };
+  } catch (error) {
+    console.error('User creation error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get user information
+ * GET /user/:userId
+ */
+async function getUser(userId) {
+  try {
+    const user = await DBService.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    return user.get_metadata();
+  } catch (error) {
+    console.error('Get user error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get all portfolios for a user
+ * GET /user/:userId/portfolios
+ */
+async function getUserPortfolios(userId) {
+  try {
+    const portfolios = await DBService.getUserPortfolios(userId);
+    
+    return {
+      userId,
+      portfolios,
+      count: portfolios.length,
+      message: `Found ${portfolios.length} portfolio(s)`
+    };
+  } catch (error) {
+    console.error('Get user portfolios error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Search/validate stock symbols
+ * POST /stocks/search
+ * Body: { symbols: string[] } - Array of symbols to validate
+ * Returns: Array of valid symbols with metadata
+ */
+async function searchStocks(body) {
+  try {
+    const { symbols } = body;
+    
+    if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
+      throw new Error('symbols array is required');
+    }
+
+    if (symbols.length > 50) {
+      throw new Error('Maximum 50 symbols per request');
+    }
+
+    console.log(`Validating ${symbols.length} stock symbols...`);
+    
+    const results = [];
+    
+    for (const symbol of symbols) {
+      try {
+        const security = new Security(symbol.toUpperCase());
+        const isValid = await security.validate_symbol();
+        
+        if (isValid) {
+          results.push({
+            symbol: symbol.toUpperCase(),
+            valid: true,
+            metadata: security.get_metadata()
+          });
+        } else {
+          results.push({
+            symbol: symbol.toUpperCase(),
+            valid: false,
+            error: 'Symbol not found or invalid'
+          });
+        }
+      } catch (error) {
+        results.push({
+          symbol: symbol.toUpperCase(),
+          valid: false,
+          error: error.message
+        });
+      }
+    }
+
+    const validCount = results.filter(r => r.valid).length;
+    
+    return {
+      total: symbols.length,
+      valid: validCount,
+      invalid: symbols.length - validCount,
+      results: results
+    };
+  } catch (error) {
+    console.error('Stock search error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get list of commonly available stocks (popular US stocks)
+ * GET /stocks/popular
+ * Returns: Array of popular stock symbols with metadata
+ */
+async function getPopularStocks() {
+  try {
+    // List of commonly traded US stocks across major exchanges
+    const popularSymbols = [
+      // Technology
+      'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'NVDA', 'NFLX', 'TSLA', 'AMD',
+      // Finance
+      'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BRK.B',
+      // Healthcare
+      'JNJ', 'PFE', 'UNH', 'ABBV', 'TMO',
+      // Consumer
+      'WMT', 'HD', 'MCD', 'SBUX', 'NKE', 'DIS',
+      // Energy
+      'XOM', 'CVX', 'COP',
+      // Industrial
+      'BA', 'CAT', 'GE', 'HON',
+      // Communication
+      'VZ', 'T', 'CMCSA',
+      // Utilities
+      'NEE', 'DUK',
+      // Retail
+      'COST', 'TGT',
+      // Other
+      'V', 'MA', 'PG', 'KO', 'PEP'
+    ];
+
+    console.log(`Checking ${popularSymbols.length} popular stocks...`);
+    
+    const results = [];
+    
+    // Check in batches to respect rate limits (5 per minute)
+    for (let i = 0; i < popularSymbols.length; i += 5) {
+      const batch = popularSymbols.slice(i, i + 5);
+      
+      for (const symbol of batch) {
+        try {
+          const security = new Security(symbol);
+          const isValid = await security.validate_symbol();
+          
+          if (isValid) {
+            results.push(security.get_metadata());
+          }
+        } catch (error) {
+          console.warn(`Could not validate ${symbol}:`, error.message);
+        }
+      }
+      
+      // Rate limit: wait 1 minute between batches (5 calls/min limit)
+      if (i + 5 < popularSymbols.length) {
+        await new Promise(resolve => setTimeout(resolve, 61000)); // 61 seconds
+      }
+    }
+
+    return {
+      count: results.length,
+      stocks: results,
+      note: 'This is a sample of popular US stocks. Alpha Vantage supports US exchanges (NYSE, NASDAQ). Use POST /stocks/search to validate specific symbols.'
+    };
+  } catch (error) {
+    console.error('Error getting popular stocks:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   initializePortfolio,
   getPortfolioSignals,
@@ -345,5 +596,10 @@ module.exports = {
   runBacktest,
   getPaperTradingStatus,
   generateCoupledTrade,
-  getPortfolioPerformance
+  getPortfolioPerformance,
+  createUser,
+  getUser,
+  getUserPortfolios,
+  searchStocks,
+  getPopularStocks
 };
