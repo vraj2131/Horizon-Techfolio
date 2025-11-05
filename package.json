@@ -11,7 +11,8 @@
     "update-prices": "node scripts/daily-update.js",
     "populate-db": "node scripts/populate-database.js",
     "test-features": "node scripts/test-features.js",
-    "test-indicators": "node scripts/test-indicators.js"
+    "test-indicators": "node scripts/test-indicators.js",
+    "setup-cron": "bash scripts/setup-cron.sh"
   },
   "keywords": [
     "trading",

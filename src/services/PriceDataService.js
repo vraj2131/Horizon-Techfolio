@@ -11,7 +11,7 @@ const config = require('../../config/config');
 class PriceDataService {
   constructor() {
     this.marketDataProvider = new MarketDataProvider();
-    this.useDatabase = isDBConnected();
+    // Don't set useDatabase in constructor - check dynamically
   }
 
   /**
@@ -20,7 +20,7 @@ class PriceDataService {
    */
   async getPriceData(ticker, startDate, endDate, interval = 'daily') {
     // Try database first
-    if (this.useDatabase) {
+    if (isDBConnected()) {
       const dbData = await this.getFromDatabase(ticker, startDate, endDate, interval);
       if (dbData && dbData.length > 0) {
         console.log(`✅ Retrieved ${dbData.length} data points from database for ${ticker}`);
@@ -32,7 +32,7 @@ class PriceDataService {
     const cachedData = await this.marketDataProvider.get_prices(ticker, startDate, endDate, interval);
     if (cachedData && cachedData.length > 0) {
       // Also save to database for future use
-      if (this.useDatabase) {
+      if (isDBConnected()) {
         await this.saveToDatabase(ticker, cachedData, interval);
       }
       return cachedData;
@@ -68,20 +68,29 @@ class PriceDataService {
    * Save price data to database
    */
   async saveToDatabase(ticker, priceData, interval = 'daily') {
-    if (!this.useDatabase || !priceData || priceData.length === 0) {
+    const dbConnected = isDBConnected();
+    if (!dbConnected || !priceData || priceData.length === 0) {
+      console.log(`⚠️  Skipping database save for ${ticker}: dbConnected=${dbConnected}, priceData=${priceData ? priceData.length : 0} points`);
       return;
     }
 
     try {
+      console.log(`📝 Attempting to save ${priceData.length} data points for ${ticker}...`);
+      
       // Get existing data
       const existing = await PriceDataModel.findOne({ ticker, interval });
       
       if (existing) {
+        console.log(`   Found existing ${ticker} data: ${existing.data.length} points, last date: ${existing.lastDate}`);
+        
         // Merge with existing data (avoid duplicates)
         const existingDates = new Set(existing.data.map(p => p.date));
         const newDataPoints = priceData.filter(p => !existingDates.has(p.date));
         
+        console.log(`   New data to add: ${newDataPoints.length} points`);
         if (newDataPoints.length > 0) {
+          console.log(`   New dates: ${newDataPoints.map(p => p.date).join(', ')}`);
+          
           existing.data.push(...newDataPoints);
           existing.data.sort((a, b) => new Date(a.date) - new Date(b.date));
           existing.lastDate = existing.data[existing.data.length - 1].date;
@@ -89,9 +98,14 @@ class PriceDataService {
           existing.totalDataPoints = existing.data.length;
           existing.lastUpdated = new Date();
           await existing.save();
-          console.log(`✅ Updated ${ticker}: Added ${newDataPoints.length} new data points`);
+          console.log(`✅ Updated ${ticker}: Added ${newDataPoints.length} new data points (total now: ${existing.totalDataPoints})`);
+          console.log(`   New last date: ${existing.lastDate}`);
+        } else {
+          console.log(`ℹ️  No new data to add for ${ticker} (all dates already exist)`);
         }
       } else {
+        console.log(`   No existing ${ticker} data found, creating new document...`);
+        
         // Create new document
         const priceDataDoc = new PriceDataModel({
           ticker,
@@ -104,9 +118,10 @@ class PriceDataService {
         });
         await priceDataDoc.save();
         console.log(`✅ Saved ${ticker}: ${priceData.length} data points to database`);
+        console.log(`   Date range: ${priceData[0].date} to ${priceData[priceData.length - 1].date}`);
       }
     } catch (error) {
-      console.error(`Error saving price data to database for ${ticker}:`, error.message);
+      console.error(`❌ Error saving price data to database for ${ticker}:`, error.message);
     }
   }
 
@@ -116,6 +131,9 @@ class PriceDataService {
    */
   async updateLatestData(ticker, interval = 'daily') {
     try {
+      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`🔍 Checking update for ${ticker}`);
+      
       const existing = await PriceDataModel.findOne({ ticker, interval });
       
       // Calculate yesterday's date (last trading day)
@@ -124,6 +142,9 @@ class PriceDataService {
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
       
+      console.log(`   Today: ${today.toISOString().split('T')[0]}`);
+      console.log(`   Yesterday (target): ${yesterdayStr}`);
+      
       if (!existing) {
         // No data exists - initialize with full history
         console.log(`📥 No data exists for ${ticker}, initializing...`);
@@ -131,15 +152,22 @@ class PriceDataService {
         return;
       }
       
+      console.log(`   Current last date in DB: ${existing.lastDate}`);
+      console.log(`   Needs update: ${existing.lastDate < yesterdayStr}`);
+      
       // Check if we need to update (data is older than yesterday)
       if (existing.lastDate < yesterdayStr) {
-        console.log(`🔄 Updating ${ticker} with latest data (last date: ${existing.lastDate}, fetching up to ${yesterdayStr})`);
+        console.log(`🔄 ${ticker} needs update! Fetching from ${existing.lastDate} to ${yesterdayStr}...`);
         
         // Fetch from lastDate to yesterday (API returns all data in range, but we'll filter duplicates)
         // Note: We fetch from lastDate (not lastDate+1) because Alpha Vantage requires a start date
         // The saveToDatabase method will filter out duplicates based on date
         const newData = await this.marketDataProvider.get_prices(ticker, existing.lastDate, yesterdayStr, interval);
+        
+        console.log(`   API returned: ${newData ? newData.length : 0} data points`);
+        
         if (newData && newData.length > 0) {
+          console.log(`   Dates in response: ${newData.map(d => d.date).join(', ')}`);
           await this.saveToDatabase(ticker, newData, interval);
         } else {
           console.log(`⚠️  No new data returned from API for ${ticker}`);
@@ -147,8 +175,10 @@ class PriceDataService {
       } else {
         console.log(`✅ ${ticker} data is up to date (last date: ${existing.lastDate})`);
       }
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     } catch (error) {
-      console.error(`Error updating latest data for ${ticker}:`, error.message);
+      console.error(`❌ Error updating latest data for ${ticker}:`, error.message);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     }
   }
 
