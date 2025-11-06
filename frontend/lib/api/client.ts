@@ -40,13 +40,26 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       
+      // Log the error for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('401 Unauthorized - Request details:', {
+          url: originalRequest.url,
+          method: originalRequest.method,
+          hasToken: !!Cookies.get('auth_token'),
+          error: error.response?.data
+        });
+      }
+      
       // Clear auth data
       Cookies.remove('auth_token');
       Cookies.remove('user_id');
       
-      // Redirect to login
+      // Only redirect if we're not already on login/register page
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
+          window.location.href = '/login';
+        }
       }
       
       return Promise.reject(error);

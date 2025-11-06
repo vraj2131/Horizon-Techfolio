@@ -750,6 +750,7 @@ async function getAvailableStocks() {
 /**
  * Get watchlist with current prices and daily changes
  * GET /stocks/watchlist
+ * Optimized: Only fetches last 2 data points per stock using MongoDB aggregation
  */
 async function getWatchlist() {
   try {
@@ -764,30 +765,38 @@ async function getWatchlist() {
       };
     }
 
-    // Get all tickers with price data
-    const priceDataDocs = await PriceDataModel.find({ interval: 'daily' })
-      .select('ticker data lastDate')
-      .sort({ ticker: 1 });
+    // Use aggregation to get only the last 2 data points per ticker (much faster!)
+    const priceDataDocs = await PriceDataModel.aggregate([
+      { $match: { interval: 'daily' } },
+      { $project: {
+        ticker: 1,
+        lastDate: 1,
+        // Get only the last 2 elements from data array
+        latestData: { $slice: ['$data', -1] },
+        previousData: { $slice: ['$data', -2, 1] }
+      }},
+      { $sort: { ticker: 1 } }
+    ]);
 
     const watchlist = [];
 
     for (const doc of priceDataDocs) {
-      if (!doc.data || doc.data.length < 2) {
-        continue; // Skip if insufficient data
+      const latestData = doc.latestData && doc.latestData[0];
+      const previousData = doc.previousData && doc.previousData[0];
+
+      if (!latestData) {
+        continue; // Skip if no latest data
       }
 
-      // Get latest two data points to calculate change
-      const latestData = doc.data[doc.data.length - 1];
-      const previousData = doc.data[doc.data.length - 2];
-
+      // Use previousData if available, otherwise use latestData for both
+      const prevClose = previousData ? parseFloat(previousData.close) : parseFloat(latestData.close);
       const currentPrice = parseFloat(latestData.close);
-      const previousClose = parseFloat(previousData.close);
-      const change = currentPrice - previousClose;
-      const changePercent = (change / previousClose) * 100;
+      const change = currentPrice - prevClose;
+      const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
 
       watchlist.push({
         ticker: doc.ticker,
-        name: getStockName(doc.ticker), // Helper function for company names
+        name: getStockName(doc.ticker),
         price: currentPrice,
         change: parseFloat(change.toFixed(2)),
         changePercent: parseFloat(changePercent.toFixed(2)),
@@ -796,7 +805,7 @@ async function getWatchlist() {
         low: parseFloat(latestData.low),
         open: parseFloat(latestData.open),
         date: latestData.date,
-        previousClose: previousClose
+        previousClose: prevClose
       });
     }
 
@@ -804,7 +813,7 @@ async function getWatchlist() {
       watchlist,
       count: watchlist.length,
       lastUpdated: watchlist.length > 0 ? watchlist[0].date : null,
-      marketStatus: getMarketStatus() // Helper function for market hours
+      marketStatus: getMarketStatus()
     };
   } catch (error) {
     console.error('Error getting watchlist:', error.message);
@@ -916,6 +925,389 @@ async function getStockDetails(ticker) {
 }
 
 /**
+ * Get technical indicators for a single stock
+ * GET /stocks/:ticker/indicators
+ */
+async function getStockIndicators(ticker) {
+  try {
+    const { isDBConnected } = require('../db/connection');
+    const { IndicatorService } = require('../services/IndicatorService');
+    const PriceDataService = require('../services/PriceDataService');
+    
+    if (!isDBConnected()) {
+      throw new Error('Database not connected');
+    }
+
+    const tickerUpper = ticker.toUpperCase();
+    
+    // Get price data (last year for indicators)
+    const today = new Date();
+    const endDate = today.toISOString().split('T')[0];
+    const startDate = new Date(today);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    const startDateStr = startDate.toISOString().split('T')[0];
+    
+    const priceDataService = new PriceDataService();
+    const priceData = await priceDataService.getPriceData(tickerUpper, startDateStr, endDate, 'daily');
+    
+    if (!priceData || priceData.length === 0) {
+      throw new Error(`No price data found for ${tickerUpper}`);
+    }
+
+    // Get latest price
+    const latestPrice = priceData[priceData.length - 1].close;
+    
+    // Calculate all indicators with default parameters
+    const indicators = {
+      SMA: { window: 20 },
+      EMA: { window: 12 },
+      RSI: { window: 14, overbought: 70, oversold: 30 },
+      MACD: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
+      BOLLINGER: { window: 20, multiplier: 2 }
+    };
+
+    const results = {};
+    
+    for (const [indicatorType, params] of Object.entries(indicators)) {
+      try {
+        const indicator = IndicatorService.createIndicator(indicatorType, params);
+        const values = indicator.compute(priceData);
+        const signals = indicator.getAllSignals();
+        const metadata = indicator.getMetadata();
+        
+        // Get latest value and signal
+        // Handle different indicator value structures to determine latestIndex
+        let latestIndex = 0;
+        if (indicatorType === 'MACD' && values.macdLine && Array.isArray(values.macdLine)) {
+          latestIndex = values.macdLine.length > 0 ? values.macdLine.length - 1 : 0;
+        } else if (indicatorType === 'BOLLINGER' && values.upper && Array.isArray(values.upper)) {
+          latestIndex = values.upper.length > 0 ? values.upper.length - 1 : 0;
+        } else if (Array.isArray(values)) {
+          latestIndex = values.length > 0 ? values.length - 1 : 0;
+        }
+        
+        let latestValue = null;
+        const latestSignal = signals[latestIndex] || 'hold';
+        
+        // Handle different indicator value structures
+        if (indicatorType === 'MACD') {
+          // MACD histogram array is shorter than macdLine due to signalPeriod offset
+          // Use the last valid index for each array
+          const macdValue = values.macdLine && Array.isArray(values.macdLine) && latestIndex < values.macdLine.length 
+            ? values.macdLine[latestIndex] 
+            : null;
+          const signalValue = values.signalLine && Array.isArray(values.signalLine) && latestIndex < values.signalLine.length 
+            ? values.signalLine[latestIndex] 
+            : null;
+          
+          // Histogram array is shorter, use its last index
+          const histogramValue = values.histogram && Array.isArray(values.histogram) && values.histogram.length > 0
+            ? values.histogram[values.histogram.length - 1]
+            : null;
+          
+          latestValue = {
+            macd: macdValue,
+            signal: signalValue,
+            histogram: histogramValue
+          };
+        } else if (indicatorType === 'BOLLINGER') {
+          latestValue = {
+            upper: values.upper && Array.isArray(values.upper) ? values.upper[latestIndex] : null,
+            middle: values.middle && Array.isArray(values.middle) ? values.middle[latestIndex] : null,
+            lower: values.lower && Array.isArray(values.lower) ? values.lower[latestIndex] : null,
+            currentPrice: latestPrice
+          };
+        } else {
+          latestValue = Array.isArray(values) ? values[latestIndex] : null;
+        }
+
+        // Get signal strength
+        const signalStrength = indicator.getSignalStrength ? indicator.getSignalStrength(latestIndex) : 0.5;
+        
+        // Generate explanation (wrap in try-catch to handle any formatting errors)
+        let explanation;
+        try {
+          explanation = generateIndicatorExplanation(
+            indicatorType,
+            latestValue,
+            latestSignal,
+            params,
+            latestPrice
+          );
+        } catch (explanationError) {
+          console.warn(`Failed to generate explanation for ${indicatorType}:`, explanationError.message);
+          explanation = {
+            signalExplanation: `Unable to generate explanation for ${indicatorType}`,
+            description: `${indicatorType} indicator calculation completed`,
+            currentValue: latestValue,
+            currentPrice: latestPrice
+          };
+        }
+
+        results[indicatorType] = {
+          type: indicatorType,
+          value: latestValue,
+          signal: latestSignal,
+          strength: signalStrength,
+          params,
+          explanation,
+          metadata: {
+            ...metadata,
+            window: indicator.window
+          },
+          allValues: values, // Include all values for charting
+          allSignals: signals // Include all signals for charting
+        };
+      } catch (error) {
+        console.warn(`Failed to calculate ${indicatorType} for ${tickerUpper}:`, error.message);
+        results[indicatorType] = {
+          type: indicatorType,
+          error: error.message,
+          value: null,
+          signal: 'hold',
+          strength: 0
+        };
+      }
+    }
+
+    return {
+      ticker: tickerUpper,
+      currentPrice: latestPrice,
+      indicators: results,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error(`Error getting indicators for ${ticker}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get stock recommendation based on ticker and horizon
+ * POST /stocks/recommend
+ * Body: { ticker: string, horizon: number, riskTolerance?: string }
+ */
+async function getStockRecommendation(body) {
+  try {
+    const { ticker, horizon, riskTolerance = 'medium' } = body;
+    
+    if (!ticker || !horizon) {
+      throw new Error('Ticker and horizon are required');
+    }
+
+    const { isDBConnected } = require('../db/connection');
+    const IndicatorService = require('../services/IndicatorService');
+    const StrategyService = require('../services/StrategyService');
+    const PriceDataService = require('../services/PriceDataService');
+    
+    if (!isDBConnected()) {
+      throw new Error('Database not connected');
+    }
+
+    const tickerUpper = ticker.toUpperCase();
+    const horizonNum = parseInt(horizon);
+    
+    if (isNaN(horizonNum) || horizonNum < 1) {
+      throw new Error('Horizon must be a positive number (years)');
+    }
+
+    // Get price data (last year for indicators)
+    const today = new Date();
+    const endDate = today.toISOString().split('T')[0];
+    const startDate = new Date(today);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    const startDateStr = startDate.toISOString().split('T')[0];
+    
+    const priceDataService = new PriceDataService();
+    const priceData = await priceDataService.getPriceData(tickerUpper, startDateStr, endDate, 'daily');
+    
+    if (!priceData || priceData.length === 0) {
+      throw new Error(`No price data found for ${tickerUpper}`);
+    }
+
+    const latestPrice = priceData[priceData.length - 1].close;
+    
+    // Recommend strategy based on horizon
+    const strategyService = new StrategyService();
+    const recommendation = strategyService.recommendStrategy({
+      horizon: horizonNum,
+      riskTolerance,
+      portfolioSize: 1 // Single stock
+    });
+
+    const strategy = recommendation.strategyObject;
+    
+    // Calculate indicators using the recommended strategy
+    const indicatorResults = {};
+    const indicatorSignals = {};
+    
+    for (const indicatorConfig of strategy.indicators) {
+      try {
+        const indicator = IndicatorService.createIndicator(
+          indicatorConfig.type,
+          indicatorConfig.params
+        );
+        
+        const values = indicator.compute(priceData);
+        const signals = indicator.getAllSignals();
+        
+        const latestIndex = Array.isArray(values) 
+          ? (values.length > 0 ? values.length - 1 : 0)
+          : (values.macd && Array.isArray(values.macd) 
+            ? (values.macd.length > 0 ? values.macd.length - 1 : 0)
+            : (values.upper && Array.isArray(values.upper)
+              ? (values.upper.length > 0 ? values.upper.length - 1 : 0)
+              : 0));
+        
+        const latestSignal = signals[latestIndex] || 'hold';
+        
+        indicatorResults[indicatorConfig.type] = {
+          type: indicatorConfig.type,
+          value: Array.isArray(values) ? values[latestIndex] : values,
+          signal: latestSignal,
+          params: indicatorConfig.params,
+          allSignals: signals
+        };
+        
+        indicatorSignals[indicatorConfig.type] = signals;
+      } catch (error) {
+        console.warn(`Failed to calculate ${indicatorConfig.type} for ${tickerUpper}:`, error.message);
+        indicatorResults[indicatorConfig.type] = {
+          type: indicatorConfig.type,
+          error: error.message,
+          signal: 'hold'
+        };
+        indicatorSignals[indicatorConfig.type] = ['hold'];
+      }
+    }
+
+    // Generate final signal using strategy rules
+    const finalSignal = strategy.applyRules(indicatorSignals, priceData);
+    const confidence = strategy.calculateConfidence(indicatorSignals, priceData);
+    const reason = strategy.generateReason(finalSignal, indicatorSignals);
+
+    // Generate comprehensive recommendation
+    const recommendationText = generateRecommendationText(
+      finalSignal,
+      confidence,
+      reason,
+      recommendation.strategy,
+      horizonNum,
+      latestPrice
+    );
+
+    return {
+      ticker: tickerUpper,
+      currentPrice: latestPrice,
+      horizon: horizonNum,
+      riskTolerance,
+      recommendedStrategy: recommendation.strategy,
+      strategyName: strategy.name,
+      strategyDescription: strategy.getStrategyDescription(),
+      strategyFrequency: recommendation.frequency,
+      strategyConfidence: recommendation.confidence,
+      strategyReasoning: recommendation.reasoning,
+      finalRecommendation: finalSignal,
+      confidence: confidence,
+      recommendationText,
+      reason,
+      indicators: indicatorResults,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error getting stock recommendation:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Generate comprehensive recommendation text
+ */
+function generateRecommendationText(signal, confidence, reason, strategyName, horizon, currentPrice) {
+  const confidenceLevel = confidence > 0.7 ? 'high' : confidence > 0.4 ? 'moderate' : 'low';
+  const confidenceText = confidenceLevel === 'high' 
+    ? 'strong confidence' 
+    : confidenceLevel === 'moderate' 
+    ? 'moderate confidence' 
+    : 'low confidence';
+  
+  const strategyNames = {
+    'conservative': 'Conservative Strategy',
+    'momentum': 'Momentum Strategy',
+    'trend_following': 'Trend Following Strategy',
+    'mean_reversion': 'Mean Reversion Strategy'
+  };
+
+  const strategyDisplayName = strategyNames[strategyName] || strategyName;
+
+  let recommendation = '';
+  
+  if (signal === 'buy') {
+    recommendation = `Based on the ${strategyDisplayName} analysis for a ${horizon}-year horizon, we recommend **BUYING** with ${confidenceText} (${(confidence * 100).toFixed(0)}% confidence). `;
+    recommendation += `The technical indicators suggest ${reason}. `;
+    recommendation += `This recommendation is optimized for a ${horizon}-year investment horizon.`;
+  } else if (signal === 'sell') {
+    recommendation = `Based on the ${strategyDisplayName} analysis for a ${horizon}-year horizon, we recommend **SELLING** with ${confidenceText} (${(confidence * 100).toFixed(0)}% confidence). `;
+    recommendation += `The technical indicators suggest ${reason}. `;
+    recommendation += `This recommendation is optimized for a ${horizon}-year investment horizon.`;
+  } else {
+    recommendation = `Based on the ${strategyDisplayName} analysis for a ${horizon}-year horizon, we recommend **HOLDING** with ${confidenceText} (${(confidence * 100).toFixed(0)}% confidence). `;
+    recommendation += `The technical indicators are ${reason || 'showing mixed signals'}. `;
+    recommendation += `This recommendation is optimized for a ${horizon}-year investment horizon.`;
+  }
+
+  return recommendation;
+}
+
+/**
+ * Generate human-readable explanation for an indicator
+ */
+function generateIndicatorExplanation(type, value, signal, params, currentPrice) {
+  const explanations = {
+    SMA: {
+      buy: `Price crossed above the ${params.window}-day Simple Moving Average. The SMA is the average of closing prices over the last ${params.window} days. When price breaks above this average, it suggests upward momentum.`,
+      sell: `Price crossed below the ${params.window}-day Simple Moving Average. This indicates potential downward momentum as price falls below the average of recent closes.`,
+      hold: `Price is trading near the ${params.window}-day Simple Moving Average. The SMA (${typeof value === 'number' ? value.toFixed(2) : 'N/A'}) acts as a support/resistance level. No clear trend signal.`,
+      description: `Simple Moving Average (SMA) calculates the average closing price over ${params.window} periods. It smooths out price fluctuations to show the overall trend.`
+    },
+    EMA: {
+      buy: `Price crossed above the ${params.window}-day Exponential Moving Average. EMA gives more weight to recent prices than SMA, making it more responsive to current trends.`,
+      sell: `Price crossed below the ${params.window}-day Exponential Moving Average. The EMA reacts faster to price changes, indicating a potential trend reversal.`,
+      hold: `Price is trading near the ${params.window}-day EMA (${typeof value === 'number' ? value.toFixed(2) : 'N/A'}). The EMA emphasizes recent price action more than the SMA.`,
+      description: `Exponential Moving Average (EMA) is similar to SMA but gives exponentially decreasing weight to older prices, making it more sensitive to recent price movements.`
+    },
+    RSI: {
+      buy: `RSI is ${typeof value === 'number' ? value.toFixed(2) : 'N/A'} (below ${params.oversold}). RSI measures momentum on a 0-100 scale. Values below ${params.oversold} suggest the stock is oversold and may bounce back.`,
+      sell: `RSI is ${typeof value === 'number' ? value.toFixed(2) : 'N/A'} (above ${params.overbought}). Values above ${params.overbought} indicate the stock is overbought and may pull back.`,
+      hold: `RSI is ${typeof value === 'number' ? value.toFixed(2) : 'N/A'} (between ${params.oversold} and ${params.overbought}). This indicates neutral momentum. RSI compares average gains to average losses over ${params.window} periods.`,
+      description: `Relative Strength Index (RSI) measures the speed and magnitude of price changes. It's calculated by comparing average gains to average losses over ${params.window} periods, normalized to a 0-100 scale.`
+    },
+    MACD: {
+      buy: `MACD line (${value && typeof value.macd === 'number' ? value.macd.toFixed(2) : 'N/A'}) crossed above the signal line (${value && typeof value.signal === 'number' ? value.signal.toFixed(2) : 'N/A'}). This bullish crossover indicates increasing upward momentum. The histogram shows the difference between MACD and signal lines.`,
+      sell: `MACD line (${value && typeof value.macd === 'number' ? value.macd.toFixed(2) : 'N/A'}) crossed below the signal line (${value && typeof value.signal === 'number' ? value.signal.toFixed(2) : 'N/A'}). This bearish crossover suggests weakening momentum.`,
+      hold: `MACD is neutral. MACD (${value && typeof value.macd === 'number' ? value.macd.toFixed(2) : 'N/A'}) is calculated from the difference between ${params.fastPeriod}-day and ${params.slowPeriod}-day EMAs. The signal line is a ${params.signalPeriod}-day EMA of the MACD line.`,
+      description: `Moving Average Convergence Divergence (MACD) shows the relationship between two EMAs (${params.fastPeriod}-day and ${params.slowPeriod}-day). The MACD line crossing the signal line (${params.signalPeriod}-day EMA of MACD) generates buy/sell signals.`
+    },
+    BOLLINGER: {
+      buy: `Price ($${typeof currentPrice === 'number' ? currentPrice.toFixed(2) : 'N/A'}) touched or crossed the lower Bollinger Band ($${typeof value?.lower === 'number' ? value.lower.toFixed(2) : 'N/A'}). This suggests the stock is oversold and may rebound toward the middle band ($${typeof value?.middle === 'number' ? value.middle.toFixed(2) : 'N/A'}).`,
+      sell: `Price ($${typeof currentPrice === 'number' ? currentPrice.toFixed(2) : 'N/A'}) touched or crossed the upper Bollinger Band ($${typeof value?.upper === 'number' ? value.upper.toFixed(2) : 'N/A'}). This indicates the stock is overbought and may pull back.`,
+      hold: `Price is trading within the Bollinger Bands. The middle band ($${typeof value?.middle === 'number' ? value.middle.toFixed(2) : 'N/A'}) is the ${params.window}-day SMA. Upper and lower bands are ${params.multiplier} standard deviations away, indicating volatility.`,
+      description: `Bollinger Bands consist of a ${params.window}-day SMA (middle band) and upper/lower bands ${params.multiplier} standard deviations away. They show price volatility and potential support/resistance levels.`
+    }
+  };
+
+  const exp = explanations[type];
+  if (!exp) return `No explanation available for ${type}`;
+  
+  return {
+    signalExplanation: exp[signal] || exp.hold,
+    description: exp.description,
+    currentValue: value,
+    currentPrice: currentPrice
+  };
+}
+
+/**
  * Helper: Get market status
  */
 function getMarketStatus() {
@@ -1022,5 +1414,7 @@ module.exports = {
   getPopularStocks,
   getAvailableStocks,
   getWatchlist,
-  getStockDetails
+  getStockDetails,
+  getStockIndicators,
+  getStockRecommendation
 };

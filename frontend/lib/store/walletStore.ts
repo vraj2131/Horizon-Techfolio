@@ -23,6 +23,10 @@ interface WalletState {
   } | null;
   isLoading: boolean;
   error: string | null;
+  // Cache timestamps
+  lastWalletFetch: number | null;
+  lastHoldingsFetch: number | null;
+  lastTransactionsFetch: number | null;
 }
 
 interface WalletActions {
@@ -38,7 +42,13 @@ interface WalletActions {
 
 type WalletStore = WalletState & WalletActions;
 
-export const useWalletStore = create<WalletStore>((set) => ({
+const CACHE_DURATION = {
+  wallet: 30000,      // 30 seconds
+  holdings: 60000,    // 60 seconds
+  transactions: 60000 // 60 seconds
+};
+
+export const useWalletStore = create<WalletStore>((set, get) => ({
   // Initial state
   wallet: null,
   holdings: [],
@@ -46,16 +56,28 @@ export const useWalletStore = create<WalletStore>((set) => ({
   transactionSummary: null,
   isLoading: false,
   error: null,
+  lastWalletFetch: null,
+  lastHoldingsFetch: null,
+  lastTransactionsFetch: null,
 
-  // Fetch wallet details
+  // Fetch wallet details with caching
   fetchWallet: async (userId: string) => {
+    const state = get();
+    const now = Date.now();
+    
+    // Check cache (30 second expiry)
+    if (state.wallet && state.lastWalletFetch && (now - state.lastWalletFetch) < CACHE_DURATION.wallet) {
+      return; // Use cached data
+    }
+    
     set({ isLoading: true, error: null });
     
     try {
       const wallet = await tradingApi.getWallet(userId);
       set({
         wallet,
-        isLoading: false
+        isLoading: false,
+        lastWalletFetch: now
       });
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch wallet';
@@ -111,9 +133,12 @@ export const useWalletStore = create<WalletStore>((set) => ({
     
     try {
       const response = await tradingApi.buyStock(data);
+      // Invalidate cache after trade
       set({
         wallet: response.wallet,
-        isLoading: false
+        isLoading: false,
+        lastWalletFetch: null, // Force refresh on next fetch
+        lastHoldingsFetch: null // Holdings changed
       });
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to buy stock';
@@ -131,9 +156,12 @@ export const useWalletStore = create<WalletStore>((set) => ({
     
     try {
       const response = await tradingApi.sellStock(data);
+      // Invalidate cache after trade
       set({
         wallet: response.wallet,
-        isLoading: false
+        isLoading: false,
+        lastWalletFetch: null, // Force refresh on next fetch
+        lastHoldingsFetch: null // Holdings changed
       });
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to sell stock';
@@ -165,8 +193,17 @@ export const useWalletStore = create<WalletStore>((set) => ({
     }
   },
 
-  // Fetch transactions
+  // Fetch transactions with caching
   fetchTransactions: async (userId: string, filters?: TransactionFilters) => {
+    const state = get();
+    const now = Date.now();
+    
+    // Check cache (60 second expiry, but invalidate if filters changed)
+    if (state.transactions.length > 0 && state.lastTransactionsFetch && 
+        (now - state.lastTransactionsFetch) < CACHE_DURATION.transactions && !filters) {
+      return; // Use cached data
+    }
+    
     set({ isLoading: true, error: null });
     
     try {
@@ -174,7 +211,8 @@ export const useWalletStore = create<WalletStore>((set) => ({
       set({
         transactions: Array.isArray(response.transactions) ? response.transactions : [],
         transactionSummary: response.summary,
-        isLoading: false
+        isLoading: false,
+        lastTransactionsFetch: now
       });
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch transactions';
@@ -187,8 +225,17 @@ export const useWalletStore = create<WalletStore>((set) => ({
     }
   },
 
-  // Fetch holdings
+  // Fetch holdings with caching
   fetchHoldings: async (userId: string) => {
+    const state = get();
+    const now = Date.now();
+    
+    // Check cache (60 second expiry)
+    if (state.holdings.length > 0 && state.lastHoldingsFetch && 
+        (now - state.lastHoldingsFetch) < CACHE_DURATION.holdings) {
+      return; // Use cached data
+    }
+    
     set({ isLoading: true, error: null });
     
     try {
@@ -200,7 +247,8 @@ export const useWalletStore = create<WalletStore>((set) => ({
       
       set({
         holdings: holdingsArray,
-        isLoading: false
+        isLoading: false,
+        lastHoldingsFetch: now
       });
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch holdings';

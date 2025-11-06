@@ -11,27 +11,39 @@ import {
   DollarSign,
   BarChart3,
   ShoppingCart,
-  Package
+  Package,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Loading } from '@/components/ui/Loading';
 import { Badge } from '@/components/ui/Badge';
 import { formatCurrency, formatPercent } from '@/lib/utils/formatters';
-import { getStockDetails, StockDetails } from '@/lib/api/stocks';
+import { getStockDetails, getStockIndicators, getStockRecommendation, StockDetails, StockIndicatorsResponse, StockRecommendationResponse } from '@/lib/api/stocks';
 import { useWalletStore } from '@/lib/store/walletStore';
+import { TechnicalIndicators } from '@/components/stock/TechnicalIndicators';
+import { Modal } from '@/components/ui/Modal';
+import { useToast } from '@/lib/hooks/useToast';
 
 export default function StockDetailPage() {
   const params = useParams();
   const router = useRouter();
   const ticker = (params.ticker as string)?.toUpperCase();
   const [stock, setStock] = useState<StockDetails | null>(null);
+  const [indicators, setIndicators] = useState<StockIndicatorsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingIndicators, setIsLoadingIndicators] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tradingViewLoaded, setTradingViewLoaded] = useState(false);
+  const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
+  const [selectedHorizon, setSelectedHorizon] = useState<number | null>(null);
+  const [insights, setInsights] = useState<StockRecommendationResponse | null>(null);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<any>(null);
   const { wallet, buyStock, sellStock, isLoading: isTrading } = useWalletStore();
+  const { showToast } = useToast();
 
   useEffect(() => {
     const loadStockDetails = async () => {
@@ -52,6 +64,56 @@ export default function StockDetailPage() {
 
     loadStockDetails();
   }, [ticker]);
+
+  // Load technical indicators
+  useEffect(() => {
+    const loadIndicators = async () => {
+      if (!ticker) return;
+      
+      setIsLoadingIndicators(true);
+      try {
+        const data = await getStockIndicators(ticker);
+        setIndicators(data);
+      } catch (err: any) {
+        console.error('Failed to load indicators:', err);
+        // Don't show error for indicators, just log it
+      } finally {
+        setIsLoadingIndicators(false);
+      }
+    };
+
+    loadIndicators();
+  }, [ticker]);
+
+  const handleGenerateInsights = async (horizon: number) => {
+    if (!ticker) return;
+    
+    setSelectedHorizon(horizon);
+    setIsLoadingInsights(true);
+    setInsights(null);
+
+    try {
+      const result = await getStockRecommendation({
+        ticker,
+        horizon,
+        riskTolerance: 'medium'
+      });
+      setInsights(result);
+      showToast('Insights generated successfully!', 'success');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate insights';
+      showToast(errorMessage, 'error');
+      setInsights(null);
+    } finally {
+      setIsLoadingInsights(false);
+    }
+  };
+
+  const handleCloseInsightsModal = () => {
+    setIsInsightsModalOpen(false);
+    setSelectedHorizon(null);
+    setInsights(null);
+  };
 
   // Initialize TradingView widget when script is loaded
   useEffect(() => {
@@ -166,6 +228,13 @@ export default function StockDetailPage() {
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
+                onClick={() => setIsInsightsModalOpen(true)}
+              >
+                <Brain className="w-4 h-4 mr-2" />
+                Generate Insights
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() => router.push(`/trading?ticker=${stock.ticker}`)}
               >
                 <Activity className="w-4 h-4 mr-2" />
@@ -273,6 +342,20 @@ export default function StockDetailPage() {
           />
         </GlassCard>
 
+        {/* Technical Indicators */}
+        {isLoadingIndicators ? (
+          <GlassCard className="p-8 mb-6">
+            <Loading text="Loading technical indicators..." />
+          </GlassCard>
+        ) : indicators && (
+          <div className="mb-6">
+            <TechnicalIndicators 
+              indicators={indicators.indicators} 
+              currentPrice={indicators.currentPrice || stock.currentPrice}
+            />
+          </div>
+        )}
+
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <GlassCard className="p-6">
@@ -315,6 +398,206 @@ export default function StockDetailPage() {
           </GlassCard>
         </div>
       </main>
+
+      {/* Generate Insights Modal */}
+      <Modal
+        isOpen={isInsightsModalOpen}
+        onClose={handleCloseInsightsModal}
+        title="Generate Insights"
+        size="xl"
+      >
+        <div className="space-y-6">
+          {!insights && !isLoadingInsights && (
+            <div>
+              <p className="text-slate-300 mb-6 text-center">
+                Select your investment horizon to generate AI-powered insights based on technical indicators
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[1, 2, 5].map((years) => (
+                  <button
+                    key={years}
+                    onClick={() => handleGenerateInsights(years)}
+                    className="p-6 bg-slate-800/30 backdrop-blur-xl border border-slate-700/50 rounded-lg hover:border-blue-500/50 transition-all text-left group"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg group-hover:from-blue-500/30 group-hover:to-purple-500/30 transition-colors">
+                        <Sparkles className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <Badge variant="info">{years} Year{years > 1 ? 's' : ''}</Badge>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      {years} Year{years > 1 ? 's' : ''} Horizon
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      {years === 1 && 'Short-term strategy focused on momentum and trends'}
+                      {years === 2 && 'Medium-term balanced approach with mean reversion'}
+                      {years === 5 && 'Long-term conservative strategy for steady growth'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isLoadingInsights && (
+            <div className="py-12 text-center">
+              <Loading size="lg" text="Analyzing indicators and generating insights..." />
+            </div>
+          )}
+
+          {insights && (
+            <div className="space-y-6">
+              {/* Main Recommendation */}
+              <div className={`p-6 rounded-lg border-t-4 ${
+                insights.finalRecommendation === 'buy' 
+                  ? 'bg-green-500/10 border-green-500/30' 
+                  : insights.finalRecommendation === 'sell'
+                  ? 'bg-red-500/10 border-red-500/30'
+                  : 'bg-blue-500/10 border-blue-500/30'
+              }`}>
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="p-3 bg-slate-800/50 rounded-xl">
+                    {insights.finalRecommendation === 'buy' ? (
+                      <TrendingUp className="w-6 h-6 text-green-400" />
+                    ) : insights.finalRecommendation === 'sell' ? (
+                      <TrendingDown className="w-6 h-6 text-red-400" />
+                    ) : (
+                      <Activity className="w-6 h-6 text-blue-400" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-2xl font-bold text-white">
+                        {insights.finalRecommendation.toUpperCase()}
+                      </h3>
+                      <Badge variant={insights.finalRecommendation === 'buy' ? 'success' : insights.finalRecommendation === 'sell' ? 'error' : 'info'}>
+                        {(insights.confidence * 100).toFixed(0)}% Confidence
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-slate-400">
+                      Current Price: <span className="text-white font-semibold">{formatCurrency(insights.currentPrice)}</span>
+                    </p>
+                  </div>
+                </div>
+                <p className="text-slate-300 leading-relaxed">{insights.recommendationText}</p>
+              </div>
+
+              {/* Strategy Information */}
+              <GlassCard className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <BarChart3 className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-lg font-semibold text-white">Recommended Strategy</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-slate-400 mb-1">Strategy</p>
+                    <p className="text-lg font-semibold text-white">{insights.strategyName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-400 mb-1">Description</p>
+                    <p className="text-slate-300 text-sm">{insights.strategyDescription}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Frequency</p>
+                      <p className="text-sm font-medium text-white capitalize">{insights.strategyFrequency}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Strategy Confidence</p>
+                      <p className="text-sm font-medium text-white">{(insights.strategyConfidence * 100).toFixed(0)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Recommendation Confidence</p>
+                      <p className="text-sm font-medium text-white">{(insights.confidence * 100).toFixed(0)}%</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-4 bg-slate-800/50 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Brain className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-white mb-1">Why This Strategy?</p>
+                        <p className="text-sm text-slate-300">{insights.strategyReasoning}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* Indicator Analysis */}
+              <GlassCard className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Activity className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-lg font-semibold text-white">Indicator Analysis</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                  {Object.entries(insights.indicators).map(([key, indicator]) => (
+                    <div key={key} className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-white">{indicator.type}</span>
+                        <Badge 
+                          variant={indicator.signal === 'buy' ? 'success' : indicator.signal === 'sell' ? 'error' : 'info'}
+                          className="text-xs"
+                        >
+                          {indicator.signal}
+                        </Badge>
+                      </div>
+                      {indicator.error ? (
+                        <p className="text-xs text-red-400">{indicator.error}</p>
+                      ) : (
+                        typeof indicator.value === 'number' && (
+                          <p className="text-xs text-slate-400">
+                            Value: <span className="text-white">{indicator.value.toFixed(2)}</span>
+                          </p>
+                        )
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="p-4 bg-slate-800/50 rounded-lg">
+                  <p className="text-sm text-slate-400 mb-1">Reasoning:</p>
+                  <p className="text-sm text-slate-300">{insights.reason}</p>
+                </div>
+              </GlassCard>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-slate-700/50">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    handleCloseInsightsModal();
+                    router.push(`/trading?ticker=${insights.ticker}`);
+                  }}
+                  className="flex-1"
+                >
+                  {insights.finalRecommendation === 'buy' ? (
+                    <>
+                      <TrendingUp className="w-4 h-4 mr-2" />
+                      Buy {insights.ticker}
+                    </>
+                  ) : insights.finalRecommendation === 'sell' ? (
+                    <>
+                      <TrendingDown className="w-4 h-4 mr-2" />
+                      Sell {insights.ticker}
+                    </>
+                  ) : (
+                    <>
+                      <Activity className="w-4 h-4 mr-2" />
+                      View Trading
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleCloseInsightsModal}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

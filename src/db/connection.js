@@ -21,11 +21,19 @@ async function connectDB() {
   try {
     const mongoURI = config.database?.mongoURI || process.env.MONGODB_URI || 'mongodb://localhost:27017/horizontrader';
     
-    const options = config.database?.options || {
-      // Modern MongoDB driver doesn't need these options (deprecated in v4.0.0+)
+    const options = {
+      serverSelectionTimeoutMS: 5000, // 5 second timeout
+      socketTimeoutMS: 45000, // 45 second socket timeout
+      ...(config.database?.options || {})
     };
 
-    await mongoose.connect(mongoURI, options);
+    // Use Promise.race to add a timeout
+    const connectPromise = mongoose.connect(mongoURI, options);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database connection timeout after 5 seconds')), 5000)
+    );
+    
+    await Promise.race([connectPromise, timeoutPromise]);
     
     isConnected = true;
     console.log(`✅ MongoDB connected: ${mongoURI.replace(/\/\/.*@/, '//***@')}`); // Hide credentials in logs
@@ -51,11 +59,9 @@ async function connectDB() {
     isConnected = false;
     
     // If database is not available, app can still run with in-memory storage
-    if (config.database?.required !== false) {
-      throw error;
-    } else {
-      console.log('⚠️  Continuing with in-memory storage (database optional)');
-    }
+    // Don't throw error - allow server to start without DB
+    console.log('⚠️  Continuing without database (some features may be limited)');
+    console.log('⚠️  To fix MongoDB connection: Check IP whitelist in MongoDB Atlas');
   }
 }
 

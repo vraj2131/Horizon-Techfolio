@@ -91,3 +91,111 @@ export const getStockDetails = async (ticker: string): Promise<StockDetails> => 
   return response;
 };
 
+/**
+ * Technical Indicator Types
+ */
+export interface IndicatorValue {
+  // For simple indicators (SMA, EMA, RSI)
+  value?: number;
+  // For MACD
+  macd?: number;
+  signal?: number;
+  histogram?: number;
+  // For Bollinger Bands
+  upper?: number;
+  middle?: number;
+  lower?: number;
+  currentPrice?: number;
+}
+
+export interface IndicatorExplanation {
+  signalExplanation: string;
+  description: string;
+  currentValue: IndicatorValue | number | null;
+  currentPrice?: number;
+}
+
+export interface TechnicalIndicator {
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'BOLLINGER';
+  value: IndicatorValue | number | null;
+  signal: 'buy' | 'sell' | 'hold';
+  strength: number; // 0-1
+  params: Record<string, any>;
+  explanation: IndicatorExplanation;
+  metadata: {
+    window?: number;
+    [key: string]: any;
+  };
+  allValues?: any; // For charting
+  allSignals?: string[]; // For charting
+  error?: string;
+}
+
+export interface StockIndicatorsResponse {
+  ticker: string;
+  currentPrice: number;
+  indicators: {
+    SMA?: TechnicalIndicator;
+    EMA?: TechnicalIndicator;
+    RSI?: TechnicalIndicator;
+    MACD?: TechnicalIndicator;
+    BOLLINGER?: TechnicalIndicator;
+  };
+  timestamp: string;
+}
+
+/**
+ * Get technical indicators for a stock
+ */
+export const getStockIndicators = async (ticker: string): Promise<StockIndicatorsResponse> => {
+  const response = await get<StockIndicatorsResponse>(`/stocks/${ticker}/indicators`);
+  return response;
+};
+
+/**
+ * Stock Recommendation Types
+ */
+export interface StockRecommendationRequest {
+  ticker: string;
+  horizon: number; // years
+  riskTolerance?: 'low' | 'medium' | 'high';
+}
+
+export interface IndicatorSignal {
+  type: string;
+  value?: number | any;
+  signal: 'buy' | 'sell' | 'hold';
+  params?: Record<string, any>;
+  error?: string;
+  allSignals?: string[];
+}
+
+export interface StockRecommendationResponse {
+  ticker: string;
+  currentPrice: number;
+  horizon: number;
+  riskTolerance: string;
+  recommendedStrategy: string;
+  strategyName: string;
+  strategyDescription: string;
+  strategyFrequency: string;
+  strategyConfidence: number;
+  strategyReasoning: string;
+  finalRecommendation: 'buy' | 'sell' | 'hold';
+  confidence: number;
+  recommendationText: string;
+  reason: string;
+  indicators: Record<string, IndicatorSignal>;
+  timestamp: string;
+}
+
+/**
+ * Get stock recommendation based on ticker and horizon
+ */
+export const getStockRecommendation = async (
+  data: StockRecommendationRequest
+): Promise<StockRecommendationResponse> => {
+  const response = await post<StockRecommendationResponse>('/stocks/recommend', data);
+  return response;
+};
+

@@ -32,6 +32,26 @@ export default function WatchlistPage() {
 
   const loadWatchlist = async (showRefreshing = false) => {
     try {
+      // Show cached data immediately if available (for faster perceived load time)
+      if (!showRefreshing) {
+        const cached = localStorage.getItem('watchlist_cache');
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            const cacheAge = Date.now() - (cachedData.timestamp || 0);
+            // Use cached data if less than 5 minutes old
+            if (cacheAge < 5 * 60 * 1000) {
+              setWatchlist(cachedData.watchlist || []);
+              setMarketStatus(cachedData.marketStatus || 'closed');
+              setLastUpdated(cachedData.lastUpdated);
+              setIsLoading(false); // Show cached data immediately
+            }
+          } catch (e) {
+            // Ignore cache parse errors
+          }
+        }
+      }
+
       if (showRefreshing) {
         setIsRefreshing(true);
       } else {
@@ -43,6 +63,14 @@ export default function WatchlistPage() {
       setWatchlist(response.watchlist);
       setMarketStatus(response.marketStatus);
       setLastUpdated(response.lastUpdated);
+      
+      // Cache the response
+      localStorage.setItem('watchlist_cache', JSON.stringify({
+        watchlist: response.watchlist,
+        marketStatus: response.marketStatus,
+        lastUpdated: response.lastUpdated,
+        timestamp: Date.now()
+      }));
     } catch (err: any) {
       setError(err.message || 'Failed to load watchlist');
     } finally {

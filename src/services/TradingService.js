@@ -411,18 +411,32 @@ class TradingService {
         const holding = holdings.get(tx.ticker);
 
         if (tx.type === 'buy') {
+          // When buying: add shares and total cost (including fees/commissions)
           holding.quantity += tx.quantity;
-          holding.totalCostBasis += tx.subtotal;
+          // Use total cost (subtotal + commission + fees) for accurate cost basis
+          holding.totalCostBasis += (tx.total || tx.subtotal || 0);
         } else if (tx.type === 'sell') {
+          // When selling: remove shares proportionally from cost basis
+          // Calculate average cost before selling
+          const avgCostPerShare = holding.quantity > 0 
+            ? holding.totalCostBasis / holding.quantity 
+            : 0;
+          
+          // Reduce quantity
           holding.quantity -= tx.quantity;
-          // Adjust cost basis proportionally
-          const avgCost = holding.totalCostBasis / (holding.quantity + tx.quantity);
-          holding.totalCostBasis -= avgCost * tx.quantity;
+          
+          // Reduce cost basis by the average cost of shares sold
+          const costBasisOfSharesSold = avgCostPerShare * tx.quantity;
+          holding.totalCostBasis -= costBasisOfSharesSold;
         }
 
-        // Recalculate average cost
+        // Recalculate average cost after each transaction
         if (holding.quantity > 0) {
           holding.averageCost = holding.totalCostBasis / holding.quantity;
+        } else {
+          // If quantity is 0, reset cost basis
+          holding.averageCost = 0;
+          holding.totalCostBasis = 0;
         }
       }
 

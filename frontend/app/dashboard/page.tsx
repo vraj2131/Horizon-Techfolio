@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Loading } from '@/components/ui/Loading';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, TrendingUp, TrendingDown, Activity, DollarSign, Wallet, ArrowRight, ChevronRight, Eye } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Activity, DollarSign, Wallet, ArrowRight, ChevronRight, Eye, BookOpen } from 'lucide-react';
 import { formatCurrency, formatPercent } from '@/lib/utils/formatters';
 import CreatePortfolioModal from '@/components/portfolio/CreatePortfolioModal';
 
@@ -107,6 +107,14 @@ export default function DashboardPage() {
             </div>
             
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/learn')}
+                className="hidden sm:flex"
+              >
+                <BookOpen className="w-4 h-4 mr-2" />
+                Learn
+              </Button>
               <Button
                 variant="ghost"
                 onClick={() => router.push('/watchlist')}

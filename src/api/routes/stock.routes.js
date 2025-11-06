@@ -14,7 +14,9 @@ const {
   getPopularStocks,
   getAvailableStocks,
   getWatchlist,
-  getStockDetails
+  getStockDetails,
+  getStockIndicators,
+  getStockRecommendation
 } = require('../routes');
 
 /**
@@ -63,6 +65,33 @@ router.get(
   '/watchlist',
   asyncHandler(async (req, res) => {
     const result = await getWatchlist();
+    res.json(result);
+  })
+);
+
+/**
+ * POST /stocks/recommend
+ * Get stock recommendation based on ticker and horizon
+ * Body: { ticker: string, horizon: number, riskTolerance?: string }
+ */
+router.post(
+  '/recommend',
+  asyncHandler(async (req, res) => {
+    const result = await getStockRecommendation(req.body);
+    res.json(result);
+  })
+);
+
+/**
+ * GET /stocks/:ticker/indicators
+ * Get technical indicators for a stock
+ * NOTE: This must come before /:ticker route to avoid route conflicts
+ */
+router.get(
+  '/:ticker/indicators',
+  asyncHandler(async (req, res) => {
+    const { ticker } = req.params;
+    const result = await getStockIndicators(ticker);
     res.json(result);
   })
 );

@@ -20,7 +20,8 @@ import {
   ShoppingCart,
   Package,
   Search,
-  Eye
+  Eye,
+  BookOpen
 } from 'lucide-react';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils/formatters';
 import { useToast } from '@/lib/hooks/useToast';
@@ -98,8 +99,30 @@ export default function TradingPage() {
       return;
     }
 
+    // Verify token before trading
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      showToast('Session expired. Please log in again.', 'error');
+      router.push('/login');
+      return;
+    }
+
+    // Re-verify token if not authenticated
+    if (!isAuthenticated) {
+      const valid = await verifyToken();
+      if (!valid) {
+        showToast('Session expired. Please log in again.', 'error');
+        router.push('/login');
+        return;
+      }
+    }
+
     try {
-      await buyStock(user.userId, ticker.toUpperCase(), qty);
+      await buyStock({
+        userId: user.userId,
+        ticker: ticker.toUpperCase(),
+        quantity: qty
+      });
       showToast(`Successfully bought ${qty} shares of ${ticker.toUpperCase()}`, 'success');
       
       // Reset form
@@ -143,8 +166,30 @@ export default function TradingPage() {
       return;
     }
 
+    // Verify token before trading
+    const token = Cookies.get('auth_token');
+    if (!token) {
+      showToast('Session expired. Please log in again.', 'error');
+      router.push('/login');
+      return;
+    }
+
+    // Re-verify token if not authenticated
+    if (!isAuthenticated) {
+      const valid = await verifyToken();
+      if (!valid) {
+        showToast('Session expired. Please log in again.', 'error');
+        router.push('/login');
+        return;
+      }
+    }
+
     try {
-      await sellStock(user.userId, holding.ticker, qty);
+      await sellStock({
+        userId: user.userId,
+        ticker: holding.ticker,
+        quantity: qty
+      });
       showToast(`Successfully sold ${qty} shares of ${holding.ticker}`, 'success');
       
       // Reset form
@@ -219,6 +264,14 @@ export default function TradingPage() {
             </div>
             
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/learn')}
+                className="hidden sm:flex"
+              >
+                <BookOpen className="w-4 h-4 mr-2" />
+                Learn
+              </Button>
               <Button
                 variant="ghost"
                 onClick={() => router.push('/watchlist')}

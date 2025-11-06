@@ -44,8 +44,17 @@ export const formatLargeNumber = (value: number): string => {
 /**
  * Format a date string
  */
-export const formatDate = (dateString: string): string => {
+export const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return '-';
+  
   const date = new Date(dateString);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date string:', dateString);
+    return '-';
+  }
+  
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
@@ -56,8 +65,17 @@ export const formatDate = (dateString: string): string => {
 /**
  * Format a date string with time
  */
-export const formatDateTime = (dateString: string): string => {
+export const formatDateTime = (dateString: string | null | undefined): string => {
+  if (!dateString) return '-';
+  
   const date = new Date(dateString);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date string:', dateString);
+    return '-';
+  }
+  
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',

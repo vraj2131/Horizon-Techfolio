@@ -56,9 +56,18 @@ router.get(
  */
 router.post(
   '/buy',
+  authenticate,
   validateBuyStock,
   asyncHandler(async (req, res) => {
     const { userId, ticker, quantity, portfolioId } = req.body;
+
+    // Security: Ensure authenticated user matches the userId in request
+    if (req.userId !== userId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You can only trade for your own account'
+      });
+    }
 
     const result = await tradingService.buyStock(
       userId,
@@ -87,9 +96,18 @@ router.post(
  */
 router.post(
   '/sell',
+  authenticate,
   validateSellStock,
   asyncHandler(async (req, res) => {
     const { userId, ticker, quantity, portfolioId } = req.body;
+
+    // Security: Ensure authenticated user matches the userId in request
+    if (req.userId !== userId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You can only trade for your own account'
+      });
+    }
 
     const result = await tradingService.sellStock(
       userId,
@@ -117,9 +135,18 @@ router.post(
  */
 router.post(
   '/deposit',
+  authenticate,
   validateDeposit,
   asyncHandler(async (req, res) => {
     const { userId, amount, notes } = req.body;
+
+    // Security: Ensure authenticated user matches the userId in request
+    if (req.userId !== userId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You can only deposit to your own account'
+      });
+    }
 
     const result = await tradingService.depositFunds(
       userId,

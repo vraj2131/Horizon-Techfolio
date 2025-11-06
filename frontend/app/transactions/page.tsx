@@ -92,15 +92,21 @@ export default function TransactionsPage() {
 
       // Date filters
       if (filters.startDate) {
-        const txDate = new Date(tx.timestamp);
+        const txDateStr = tx.createdAt || tx.timestamp || tx.date;
+        if (!txDateStr) return false; // Skip if no date field
+        
+        const txDate = new Date(txDateStr);
         const startDate = new Date(filters.startDate);
-        if (txDate < startDate) return false;
+        if (isNaN(txDate.getTime()) || txDate < startDate) return false;
       }
 
       if (filters.endDate) {
-        const txDate = new Date(tx.timestamp);
+        const txDateStr = tx.createdAt || tx.timestamp || tx.date;
+        if (!txDateStr) return false; // Skip if no date field
+        
+        const txDate = new Date(txDateStr);
         const endDate = new Date(filters.endDate);
-        if (txDate > endDate) return false;
+        if (isNaN(txDate.getTime()) || txDate > endDate) return false;
       }
 
       return true;
@@ -114,10 +120,10 @@ export default function TransactionsPage() {
   const totalSellTransactions = transactions.filter((tx: any) => tx.type === 'sell').length;
   const totalBuyAmount = transactions
     .filter((tx: any) => tx.type === 'buy')
-    .reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0);
+    .reduce((sum: number, tx: any) => sum + Math.abs(tx.total || tx.subtotal || 0), 0);
   const totalSellAmount = transactions
     .filter((tx: any) => tx.type === 'sell')
-    .reduce((sum: number, tx: any) => sum + tx.amount, 0);
+    .reduce((sum: number, tx: any) => sum + (tx.total || tx.subtotal || 0), 0);
 
   if (isInitializing) {
     return (
@@ -352,7 +358,7 @@ export default function TransactionsPage() {
                   {filteredTransactions.map((transaction: any, index: number) => (
                     <tr key={transaction.transactionId || index} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                       <td className="py-3 px-4 text-sm text-slate-300">
-                        {formatDate(transaction.timestamp)}
+                        {formatDate(transaction.createdAt || transaction.timestamp || transaction.date)}
                       </td>
                       <td className="py-3 px-4">
                         <Badge
@@ -380,7 +386,7 @@ export default function TransactionsPage() {
                       </td>
                       <td className="text-right py-3 px-4">
                         <span className={transaction.type === 'buy' ? 'text-red-400' : 'text-green-400'}>
-                          {transaction.type === 'buy' ? '-' : '+'}{formatCurrency(Math.abs(transaction.amount))}
+                          {transaction.type === 'buy' ? '-' : '+'}{formatCurrency(Math.abs(transaction.total || transaction.subtotal || 0))}
                         </span>
                       </td>
                       <td className="py-3 px-4">

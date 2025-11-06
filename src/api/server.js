@@ -35,6 +35,8 @@ async function startServer() {
       console.log(`   Status: ${dbStatus.status}`);
     } else {
       console.warn('⚠️  Database connection failed - running in memory mode');
+      console.warn('⚠️  Some features may not work without database connection');
+      console.warn('⚠️  To fix: Check MongoDB Atlas IP whitelist or connection string');
     }
 
     // ==================== Daily Update Service ====================

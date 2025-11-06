@@ -14,8 +14,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // If user is authenticated and trying to access login/register
-  if (token && (pathname === '/login' || pathname === '/register')) {
+  // If user is authenticated and trying to access login/register or landing page
+  if (token && (pathname === '/login' || pathname === '/register' || pathname === '/')) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
