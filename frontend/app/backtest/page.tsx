@@ -304,7 +304,7 @@ export default function BacktestPage() {
                     <div className="p-4 bg-slate-800/30 rounded-lg">
                       <p className="text-xs text-slate-400 mb-1">Total Return</p>
                       <p className={`text-2xl font-bold ${result.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {result.totalReturn >= 0 ? '+' : ''}{formatPercent(result.totalReturn)}
+                        {formatPercent(result.totalReturn)}
                       </p>
                     </div>
 
@@ -377,7 +377,7 @@ export default function BacktestPage() {
                     <div className="p-4 bg-slate-800/30 rounded-lg">
                       <p className="text-xs text-slate-400 mb-1">Average Return</p>
                       <p className={`text-2xl font-bold ${result.averageReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {result.averageReturn >= 0 ? '+' : ''}{formatPercent(result.averageReturn)}
+                        {formatPercent(result.averageReturn)}
                       </p>
                     </div>
                   </div>

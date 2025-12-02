@@ -305,7 +305,7 @@ class MarketDataProvider {
       const params = {
         function: 'TIME_SERIES_DAILY',
         symbol: ticker,
-        outputsize: 'full' // Get full historical data
+        outputsize: 'compact' // Free tier: last 100 data points (compact). Use 'full' for premium tier.
       };
 
       const data = await this.makeApiCall(params);

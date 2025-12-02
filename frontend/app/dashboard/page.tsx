@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, verifyToken, logout } = useAuthStore();
   const { portfolios, isLoading, fetchPortfolios } = usePortfolioStore();
-  const { wallet, fetchWallet } = useWalletStore();
+  const { wallet, holdings, fetchWallet, fetchHoldings } = useWalletStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -45,7 +45,8 @@ export default function DashboardPage() {
         if (user?.userId) {
           await Promise.all([
             fetchPortfolios(user.userId),
-            fetchWallet(user.userId)
+            fetchWallet(user.userId),
+            fetchHoldings(user.userId)
           ]);
         }
       } catch (error) {
@@ -93,6 +94,18 @@ export default function DashboardPage() {
     ? ((totalPortfolioValue - portfolios.reduce((sum, p) => sum + (p.initialCapital || 0), 0)) / portfolios.reduce((sum, p) => sum + (p.initialCapital || 0), 0)) * 100 
     : 0;
 
+  // Calculate total holdings value from wallet holdings
+  const totalHoldingsValue = (Array.isArray(holdings) ? holdings : []).reduce((sum: number, h: any) => 
+    sum + (h.totalValue || h.marketValue || 0), 0
+  );
+  const totalHoldingsCost = (Array.isArray(holdings) ? holdings : []).reduce((sum: number, h: any) => 
+    sum + (h.totalCostBasis || 0), 0
+  );
+  const totalHoldingsPnL = totalHoldingsValue - totalHoldingsCost;
+  const totalHoldingsPnLPercent = totalHoldingsCost > 0 
+    ? (totalHoldingsPnL / totalHoldingsCost) * 100 
+    : 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Header */}
@@ -103,7 +116,7 @@ export default function DashboardPage() {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
                 Horizon Trading
               </h1>
-              <p className="text-sm text-slate-400 mt-1">Welcome back, {user?.username}!</p>
+              <p className="text-sm text-slate-400 mt-1">Welcome back, {user?.name || user?.userId || 'User'}!</p>
             </div>
             
             <div className="flex items-center gap-3">
@@ -170,30 +183,33 @@ export default function DashboardPage() {
             </p>
           </GlassCard>
 
-          {/* Total Portfolio Value */}
+          {/* Holdings Value */}
           <GlassCard className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 bg-purple-500/10 rounded-xl">
                 <DollarSign className="w-6 h-6 text-purple-400" />
               </div>
-              <Badge variant={totalPnL >= 0 ? 'success' : 'danger'}>
-                {totalPnL >= 0 ? '+' : ''}{formatPercent(totalPnLPercent)}
+              <Badge variant={totalHoldingsPnL >= 0 ? 'success' : 'danger'}>
+                {formatPercent(totalHoldingsPnLPercent)}
               </Badge>
             </div>
-            <p className="text-sm text-slate-400 mb-1">Total Portfolio Value</p>
+            <p className="text-sm text-slate-400 mb-1">Holdings Value</p>
             <p className="text-3xl font-bold text-white">
-              {formatCurrency(totalPortfolioValue)}
+              {formatCurrency(totalHoldingsValue)}
             </p>
             <div className="flex items-center gap-2 mt-2">
-              {totalPnL >= 0 ? (
+              {totalHoldingsPnL >= 0 ? (
                 <TrendingUp className="w-4 h-4 text-green-400" />
               ) : (
                 <TrendingDown className="w-4 h-4 text-red-400" />
               )}
-              <p className={`text-sm font-medium ${totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
+              <p className={`text-sm font-medium ${totalHoldingsPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {totalHoldingsPnL >= 0 ? '+' : ''}{formatCurrency(totalHoldingsPnL)}
               </p>
             </div>
+            <p className="text-xs text-slate-500 mt-2">
+              {holdings?.length || 0} position{holdings?.length !== 1 ? 's' : ''}
+            </p>
           </GlassCard>
 
           {/* Active Portfolios */}
@@ -215,9 +231,9 @@ export default function DashboardPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-white">Your Portfolios</h2>
+              <h2 className="text-2xl font-bold text-white">Strategy Portfolios</h2>
               <p className="text-sm text-slate-400 mt-1">
-                Manage and monitor your investment portfolios
+                Goal-based portfolios with automated strategies and technical indicators
               </p>
             </div>
             <Button
@@ -258,9 +274,11 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {portfolios.map((portfolio) => {
-                const pnl = (portfolio.currentValue || 0) - (portfolio.initialCapital || 0);
-                const pnlPercent = portfolio.initialCapital > 0
-                  ? ((portfolio.currentValue || 0) - portfolio.initialCapital) / portfolio.initialCapital * 100
+                const initialCapital = portfolio.initialCapital ?? 0;
+                const currentValue = portfolio.currentValue ?? 0;
+                const pnl = currentValue - initialCapital;
+                const pnlPercent = initialCapital > 0
+                  ? ((currentValue - initialCapital) / initialCapital) * 100
                   : 0;
                 const isPositive = pnl >= 0;
 
@@ -274,7 +292,7 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors">
-                            {portfolio.name || `Portfolio ${portfolio.portfolioId.slice(0, 8)}`}
+                            {portfolio.name || `Portfolio ${portfolio.portfolioId.slice(-8)}`}
                           </h3>
                           <Badge variant={portfolio.status === 'active' ? 'success' : 'secondary'}>
                             {portfolio.status}
@@ -324,7 +342,7 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         <p className={`text-xs ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                          {isPositive ? '+' : ''}{formatPercent(pnlPercent)}
+                          {formatPercent(pnlPercent)}
                         </p>
                       </div>
                     </div>

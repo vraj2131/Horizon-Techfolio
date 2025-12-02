@@ -337,7 +337,7 @@ export default function PaperTradingPage() {
                   <p className="text-sm text-slate-400">Total Return</p>
                 </div>
                 <p className={`text-3xl font-bold ${totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {totalReturn >= 0 ? '+' : ''}{formatPercent(totalReturn)}
+                  {formatPercent(totalReturn)}
                 </p>
               </GlassCard>
 
@@ -445,7 +445,7 @@ export default function PaperTradingPage() {
                                   {isPositive ? '+' : ''}{formatCurrency(pnl)}
                                 </div>
                                 <div className="text-xs">
-                                  {isPositive ? '+' : ''}{formatPercent(pnlPercent)}
+                                  {formatPercent(pnlPercent)}
                                 </div>
                               </div>
                             </td>

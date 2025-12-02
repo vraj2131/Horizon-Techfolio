@@ -151,13 +151,59 @@ class DBService {
     if (this.useDatabase()) {
       try {
         const portfolioDocs = await PortfolioModel.find({ userId }).sort({ createdAt: -1 });
-        return portfolioDocs.map(doc => ({
-          portfolioId: doc.portfolioId,
-          userId: doc.userId,
-          horizon: doc.horizon,
-          securities: doc.securities || [],
-          createdAt: doc.createdAt
-        }));
+        return portfolioDocs.map(doc => {
+          // Get cash value - prefer saved value, fallback to initialCapital, then default
+          let cash = doc.cash;
+          if (cash === null || cash === undefined || cash === 0) {
+            // If cash is 0/null, check if we have initialCapital (for portfolios that haven't traded yet)
+            if (doc.initialCapital !== null && doc.initialCapital !== undefined && doc.initialCapital > 0) {
+              cash = doc.initialCapital; // Use initialCapital as cash for new portfolios
+            } else {
+              // For portfolios created before initialCapital field existed, use default
+              cash = 100000; // Default fallback
+            }
+          }
+          
+          // Calculate positions value - try multiple fields for compatibility
+          const positionsValue = (doc.positions || []).reduce((sum, pos) => {
+            // Try marketValue first, then calculate from quantity/currentPrice, then shares/currentPrice
+            if (pos.marketValue && pos.marketValue > 0) {
+              return sum + pos.marketValue;
+            }
+            const quantity = pos.quantity || pos.shares || 0;
+            const currentPrice = pos.currentPrice || 0;
+            if (quantity > 0 && currentPrice > 0) {
+              return sum + (quantity * currentPrice);
+            }
+            return sum;
+          }, 0);
+          
+          // Current value = cash + positions value
+          const currentValue = cash + positionsValue;
+          
+          // Initial capital: use saved initialCapital if available
+          // For portfolios created before this field existed, use cash as initialCapital
+          // This ensures: if portfolio has $100k cash and no trades, P&L = $0
+          let initialCapital = doc.initialCapital;
+          if (initialCapital === null || initialCapital === undefined) {
+            // If initialCapital not set, use cash (which should be the starting amount)
+            initialCapital = cash;
+          }
+          
+          return {
+            portfolioId: doc.portfolioId,
+            userId: doc.userId,
+            name: doc.name || null,
+            horizon: doc.horizon,
+            securities: doc.securities || [],
+            positions: doc.positions || [],
+            cash: cash,
+            initialCapital: initialCapital,
+            currentValue: currentValue,
+            status: 'active',
+            createdAt: doc.createdAt
+          };
+        });
       } catch (error) {
         console.error('Error loading user portfolios from database:', error.message);
         // Fallback: return empty array if DB fails
@@ -202,8 +248,10 @@ class DBService {
         const portfolioData = {
           portfolioId,
           userId: userId, // Required - must be validated before calling this method
+          name: portfolio.name || null, // Save portfolio name if provided
           horizon: portfolio.horizon,
           cash: portfolio.cash,
+          initialCapital: portfolio.initialCapital || portfolio.cash || null, // Track initial capital (defaults to initial cash)
           risk_budget: portfolio.risk_budget,
           securities,
           positions,

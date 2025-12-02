@@ -21,6 +21,18 @@ async function connectDB() {
   try {
     const mongoURI = config.database?.mongoURI || process.env.MONGODB_URI || 'mongodb://localhost:27017/horizontrader';
     
+    // Debug: Log which URI source is being used (without exposing credentials)
+    if (process.env.MONGODB_URI) {
+      console.log('📝 Using MONGODB_URI from environment variable');
+      const maskedURI = process.env.MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, 'mongodb+srv://$1:***@');
+      console.log(`📝 Connection string: ${maskedURI}`);
+    } else if (config.database?.mongoURI) {
+      console.log('📝 Using MONGODB_URI from config file');
+    } else {
+      console.log('⚠️  MONGODB_URI not found - using fallback localhost connection');
+      console.log('⚠️  Please set MONGODB_URI in your .env file with your MongoDB Atlas connection string');
+    }
+    
     const options = {
       serverSelectionTimeoutMS: 5000, // 5 second timeout
       socketTimeoutMS: 45000, // 45 second socket timeout

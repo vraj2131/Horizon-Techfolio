@@ -1,0 +1,701 @@
+% Section 1: Project Overview
+% This file can be included in a main document using \input{REPORT_SECTION_1_PROJECT_OVERVIEW.tex}
+% Or compiled standalone with the document structure below
+
+% Uncomment the following lines if compiling as standalone document:
+% \documentclass[11pt,a4paper]{article}
+% \usepackage[utf8]{inputenc}
+% \usepackage[T1]{fontenc}
+% \usepackage{amsmath}
+% \usepackage{amsfonts}
+% \usepackage{amssymb}
+% \begin{document}
+
+\section{Project Overview: Purpose and Key Functional Features}
+
+\subsection{Purpose}
+
+Horizon Trading Platform is a comprehensive web-based technical analysis and portfolio management system designed to assist individual investors in making informed trading decisions. The platform provides real-time market data analysis, automated trading signal generation, and portfolio management capabilities for investors managing approximately 20-stock portfolios across 1, 2, or 5-year investment horizons.
+
+The primary purpose of the system is to:
+
+\begin{enumerate}
+    \item \textbf{Democratize Technical Analysis}: Make advanced technical analysis tools accessible to individual investors without requiring extensive financial knowledge or expensive trading software.
+    
+    \item \textbf{Provide Actionable Trading Signals}: Generate clear Buy/Hold/Sell recommendations based on multiple technical indicators, helping users make informed trading decisions.
+    
+    \item \textbf{Enable Risk-Free Learning}: Allow users to practice trading strategies using virtual money (paper trading) without financial risk, making it an educational tool for learning about stock market investing.
+    
+    \item \textbf{Support Portfolio Management}: Help users track and manage their stock portfolios with features like position tracking, performance monitoring, and transaction history.
+    
+    \item \textbf{Validate Trading Strategies}: Enable users to backtest trading strategies against historical data to evaluate potential performance before implementing them in real trading scenarios.
+\end{enumerate}
+
+The system addresses the common challenges faced by individual investors, including:
+\begin{itemize}
+    \item Lack of access to professional-grade technical analysis tools
+    \item Difficulty in interpreting market indicators and signals
+    \item Need for portfolio tracking and performance monitoring
+    \item Desire to test strategies before risking real capital
+    \item Complexity of managing multiple stocks across different time horizons
+\end{itemize}
+
+\subsection{Key Functional Features}
+
+The Horizon Trading Platform implements a comprehensive set of features organized into the following functional areas:
+
+\subsubsection{User Authentication and Management}
+
+\textbf{Purpose}: Secure user access and account management
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{User Registration}: New users can create accounts with email and password
+    \item \textbf{Secure Login}: JWT-based authentication system with password hashing using bcrypt
+    \item \textbf{Session Management}: Token-based session handling with automatic expiration
+    \item \textbf{User Profiles}: Each user has a unique profile with personalized dashboard and settings
+    \item \textbf{Account Security}: Password encryption and secure token storage
+\end{itemize}
+
+\textbf{User Benefits}: 
+\begin{itemize}
+    \item Secure access to personal trading data
+    \item Privacy protection for portfolio information
+    \item Multi-user support for different investors
+\end{itemize}
+
+\subsubsection{Technical Analysis and Indicators}
+
+\textbf{Purpose}: Provide advanced technical analysis tools for stock evaluation
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Simple Moving Average (SMA)}: Calculates average closing prices over configurable periods (20, 50, 200 days) to identify trend direction
+    \item \textbf{Exponential Moving Average (EMA)}: Weighted moving average that gives more importance to recent prices, providing faster trend signals
+    \item \textbf{Relative Strength Index (RSI)}: Momentum oscillator (0--100 scale) that identifies overbought ($>70$) and oversold ($<30$) conditions
+    \item \textbf{Moving Average Convergence Divergence (MACD)}: Trend-following momentum indicator that shows relationships between two EMAs
+    \item \textbf{Bollinger Bands}: Volatility indicator using standard deviations to identify potential price breakouts and reversals
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Access to professional-grade technical indicators
+    \item Visual representation of indicator values on stock charts
+    \item Educational content explaining how each indicator works
+    \item Real-time calculation based on current market data
+\end{itemize}
+
+\subsubsection{Trading Strategy Recommendations}
+
+\textbf{Purpose}: Generate intelligent trading recommendations based on technical analysis
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Four Pre-built Strategies}:
+    \begin{itemize}
+        \item \textbf{Trend Following}: Uses SMA crossovers for identifying long-term trends
+        \item \textbf{Mean Reversion}: Combines RSI and Bollinger Bands for short-term reversals
+        \item \textbf{Momentum}: Utilizes MACD and EMA for capturing price momentum
+        \item \textbf{Conservative}: Multi-indicator consensus for risk-averse investors
+    \end{itemize}
+    \item \textbf{Strategy Selection}: Automatic strategy recommendation based on investment horizon (1, 2, or 5 years)
+    \item \textbf{Trading Frequency Recommendations}: Suggests optimal rebalancing frequency (daily, weekly, or monthly) based on strategy type and portfolio characteristics
+    \item \textbf{Signal Generation}: Generates Buy/Hold/Sell signals for each stock in the portfolio
+    \item \textbf{Confidence Scoring}: Provides confidence levels for each recommendation
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Personalized strategy recommendations
+    \item Clear action signals (Buy/Hold/Sell)
+    \item Understanding of why specific recommendations are made
+    \item Optimization for different investment timeframes
+\end{itemize}
+
+\subsubsection{Portfolio Management}
+
+\textbf{Purpose}: Enable users to create, track, and manage stock portfolios
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Portfolio Creation}: Initialize portfolios with up to 20 stocks and specify investment horizon
+    \item \textbf{Portfolio Naming}: Custom names for easy identification
+    \item \textbf{Position Tracking}: Real-time tracking of:
+    \begin{itemize}
+        \item Number of shares held
+        \item Average cost basis
+        \item Current market value
+        \item Unrealized profit/loss (both dollar and percentage)
+    \end{itemize}
+    \item \textbf{Cash Management}: Track available cash balance and initial capital
+    \item \textbf{Portfolio Performance Metrics}:
+    \begin{itemize}
+        \item Total portfolio value (cash $+$ positions)
+        \item Overall profit/loss
+        \item Return on investment (ROI)
+        \item Performance comparison against initial capital
+    \end{itemize}
+    \item \textbf{Multiple Portfolios}: Users can create and manage multiple portfolios simultaneously
+    \item \textbf{Portfolio Viewing}: Detailed view of each portfolio with all positions and performance metrics
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Centralized portfolio tracking
+    \item Real-time valuation of holdings
+    \item Performance monitoring and analysis
+    \item Support for multiple investment strategies
+\end{itemize}
+
+\subsubsection{Virtual Trading System}
+
+\textbf{Purpose}: Allow users to practice trading with virtual money
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Virtual Wallet}: Each user has a virtual wallet with initial balance (\$10,000 default)
+    \item \textbf{Stock Buying}: Purchase stocks at current market prices with virtual funds
+    \item \textbf{Stock Selling}: Sell owned stocks and realize profits/losses
+    \item \textbf{Transaction Tracking}: Complete history of all buy/sell transactions with:
+    \begin{itemize}
+        \item Transaction date and time
+        \item Stock ticker and quantity
+        \item Price per share
+        \item Total transaction value
+        \item Commission and fees
+        \item Realized profit/loss (for sell transactions)
+    \end{itemize}
+    \item \textbf{Holdings Management}: View all current stock holdings with:
+    \begin{itemize}
+        \item Current market value
+        \item Unrealized profit/loss
+        \item Percentage gains/losses
+    \end{itemize}
+    \item \textbf{Fund Deposits}: Ability to add virtual funds to wallet (for testing/demo purposes)
+    \item \textbf{Transaction Filtering}: Filter transactions by:
+    \begin{itemize}
+        \item Transaction type (buy/sell)
+        \item Stock ticker
+        \item Date range
+    \end{itemize}
+    \item \textbf{Performance Statistics}:
+    \begin{itemize}
+        \item Total buy orders and amount
+        \item Total sell orders and amount
+        \item Net cash flow
+        \item Realized profit/loss from closed positions
+    \end{itemize}
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Risk-free trading practice
+    \item Learning trading mechanics without financial risk
+    \item Testing different trading strategies
+    \item Understanding transaction costs and fees
+\end{itemize}
+
+\subsubsection{Stock Data and Market Information}
+
+\textbf{Purpose}: Provide comprehensive stock market data and information
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Real-time Stock Quotes}: Current market prices fetched from Alpha Vantage API
+    \item \textbf{Historical Price Data}: 10 years of historical daily price data stored in database
+    \item \textbf{Stock Search and Validation}: Validate stock tickers before adding to portfolio
+    \item \textbf{Popular Stocks List}: Pre-configured list of 20 popular US stocks
+    \item \textbf{Stock Details Page}: Comprehensive information for each stock including:
+    \begin{itemize}
+        \item Current price and daily change
+        \item Historical price charts
+        \item Technical indicators
+        \item Trading signals
+        \item Company information
+    \end{itemize}
+    \item \textbf{Watchlist}: Maintain a list of stocks to monitor
+    \item \textbf{Daily Price Updates}: Automated daily updates of stock prices via cron jobs
+    \item \textbf{Data Caching}: Aggressive caching to minimize API calls and improve performance
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Access to real-time and historical market data
+    \item Reliable data source (Alpha Vantage API)
+    \item Fast data retrieval through caching
+    \item Comprehensive stock information
+\end{itemize}
+
+\subsubsection{Educational Content}
+
+\textbf{Purpose}: Educate users about technical analysis and trading concepts
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Learn Technical Indicators}: Interactive educational section explaining:
+    \begin{itemize}
+        \item How each indicator works (concept and formula)
+        \item Trading signals generated by each indicator
+        \item Pro tips for using indicators effectively
+    \end{itemize}
+    \item \textbf{Interactive Calculator}: Visual calculator demonstrating indicator calculations with sample data
+    \item \textbf{Step-by-step Navigation}: Guided tour through different indicators
+    \item \textbf{Visual Examples}: Charts and examples showing indicator behavior
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Understanding of technical analysis concepts
+    \item Learning how to interpret trading signals
+    \item Building confidence in using the platform
+    \item Educational resource for trading knowledge
+\end{itemize}
+
+\subsubsection{Stock Recommendations}
+
+\textbf{Purpose}: Provide personalized stock recommendations based on technical analysis
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Individual Stock Analysis}: Get recommendations for specific stocks
+    \item \textbf{Multi-indicator Analysis}: Recommendations based on multiple technical indicators
+    \item \textbf{Confidence Scoring}: Confidence levels for each recommendation
+    \item \textbf{Reasoning Explanation}: Detailed explanation of why a recommendation is made
+    \item \textbf{Strategy-based Recommendations}: Recommendations aligned with selected trading strategy
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Data-driven stock selection
+    \item Understanding of recommendation rationale
+    \item Confidence in trading decisions
+\end{itemize}
+
+\subsubsection{Backtesting}
+
+\textbf{Purpose}: Test trading strategies against historical data
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{API Endpoint}: Backend support for backtesting requests
+    \item \textbf{Historical Simulation}: Simulate trading strategies using past market data
+    \item \textbf{Performance Metrics}: Calculate metrics like CAGR, Sharpe ratio, and maximum drawdown
+\end{itemize}
+
+\subsubsection{Paper Trading}
+
+\textbf{Purpose}: Real-time validation of trading strategies
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{API Endpoint}: Backend support for paper trading sessions
+    \item \textbf{Real-time Tracking}: Track paper trading performance in real-time
+    \item \textbf{Performance Comparison}: Compare paper trading results with backtested expectations
+\end{itemize}
+
+\subsubsection{System Administration and Security}
+
+\textbf{Purpose}: Ensure system security and reliability
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Rate Limiting}: Protection against API abuse (100 requests/15~min global, 5 requests/15~min for authentication)
+    \item \textbf{Security Headers}: Helmet.js for HTTP security headers
+    \item \textbf{CORS Configuration}: Configurable cross-origin resource sharing
+    \item \textbf{Input Validation}: All user inputs validated before processing
+    \item \textbf{Error Handling}: Comprehensive error handling with user-friendly messages
+    \item \textbf{Logging}: Request logging for debugging and monitoring
+    \item \textbf{Database Connection Management}: Graceful handling of database connection issues with in-memory fallback
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Secure platform
+    \item Protection against abuse
+    \item Reliable system operation
+    \item Data integrity
+\end{itemize}
+
+\subsection{Target Users}
+
+The system is designed for:
+
+\begin{enumerate}
+    \item \textbf{Individual Investors}: Retail investors managing personal stock portfolios
+    \item \textbf{Trading Learners}: People learning about stock trading and technical analysis
+    \item \textbf{Strategy Testers}: Investors wanting to test trading strategies before using real money
+    \item \textbf{Portfolio Managers}: Users managing multiple portfolios with different strategies
+\end{enumerate}
+
+\subsection{System Capabilities Summary}
+
+The Horizon Trading Platform successfully provides:
+
+\begin{itemize}
+    \item Complete user authentication and account management
+    \item Real-time stock market data integration
+    \item Five major technical indicators with signal generation
+    \item Four trading strategies with automatic recommendations
+    \item Full portfolio management with position tracking
+    \item Virtual trading system with transaction history
+    \item Educational content for learning technical analysis
+    \item Stock recommendations based on technical analysis
+    \item Comprehensive transaction and performance tracking
+    \item Backtesting framework
+    \item Paper trading validation
+\end{itemize}
+
+The system demonstrates a production-ready implementation of core trading and portfolio management features, providing comprehensive tools for technical analysis, portfolio management, and strategy validation.
+
+% Uncomment if compiling as standalone:
+% \end{document}
+
+% Or compiled standalone with the document structure below
+
+% Uncomment the following lines if compiling as standalone document:
+% \documentclass[11pt,a4paper]{article}
+% \usepackage[utf8]{inputenc}
+% \usepackage[T1]{fontenc}
+% \usepackage{amsmath}
+% \usepackage{amsfonts}
+% \usepackage{amssymb}
+% \begin{document}
+
+\section{Project Overview: Purpose and Key Functional Features}
+
+\subsection{Purpose}
+
+Horizon Trading Platform is a comprehensive web-based technical analysis and portfolio management system designed to assist individual investors in making informed trading decisions. The platform provides real-time market data analysis, automated trading signal generation, and portfolio management capabilities for investors managing approximately 20-stock portfolios across 1, 2, or 5-year investment horizons.
+
+The primary purpose of the system is to:
+
+\begin{enumerate}
+    \item \textbf{Democratize Technical Analysis}: Make advanced technical analysis tools accessible to individual investors without requiring extensive financial knowledge or expensive trading software.
+    
+    \item \textbf{Provide Actionable Trading Signals}: Generate clear Buy/Hold/Sell recommendations based on multiple technical indicators, helping users make informed trading decisions.
+    
+    \item \textbf{Enable Risk-Free Learning}: Allow users to practice trading strategies using virtual money (paper trading) without financial risk, making it an educational tool for learning about stock market investing.
+    
+    \item \textbf{Support Portfolio Management}: Help users track and manage their stock portfolios with features like position tracking, performance monitoring, and transaction history.
+    
+    \item \textbf{Validate Trading Strategies}: Enable users to backtest trading strategies against historical data to evaluate potential performance before implementing them in real trading scenarios.
+\end{enumerate}
+
+The system addresses the common challenges faced by individual investors, including:
+\begin{itemize}
+    \item Lack of access to professional-grade technical analysis tools
+    \item Difficulty in interpreting market indicators and signals
+    \item Need for portfolio tracking and performance monitoring
+    \item Desire to test strategies before risking real capital
+    \item Complexity of managing multiple stocks across different time horizons
+\end{itemize}
+
+\subsection{Key Functional Features}
+
+The Horizon Trading Platform implements a comprehensive set of features organized into the following functional areas:
+
+\subsubsection{User Authentication and Management}
+
+\textbf{Purpose}: Secure user access and account management
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{User Registration}: New users can create accounts with email and password
+    \item \textbf{Secure Login}: JWT-based authentication system with password hashing using bcrypt
+    \item \textbf{Session Management}: Token-based session handling with automatic expiration
+    \item \textbf{User Profiles}: Each user has a unique profile with personalized dashboard and settings
+    \item \textbf{Account Security}: Password encryption and secure token storage
+\end{itemize}
+
+\textbf{User Benefits}: 
+\begin{itemize}
+    \item Secure access to personal trading data
+    \item Privacy protection for portfolio information
+    \item Multi-user support for different investors
+\end{itemize}
+
+\subsubsection{Technical Analysis and Indicators}
+
+\textbf{Purpose}: Provide advanced technical analysis tools for stock evaluation
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Simple Moving Average (SMA)}: Calculates average closing prices over configurable periods (20, 50, 200 days) to identify trend direction
+    \item \textbf{Exponential Moving Average (EMA)}: Weighted moving average that gives more importance to recent prices, providing faster trend signals
+    \item \textbf{Relative Strength Index (RSI)}: Momentum oscillator (0--100 scale) that identifies overbought ($>70$) and oversold ($<30$) conditions
+    \item \textbf{Moving Average Convergence Divergence (MACD)}: Trend-following momentum indicator that shows relationships between two EMAs
+    \item \textbf{Bollinger Bands}: Volatility indicator using standard deviations to identify potential price breakouts and reversals
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Access to professional-grade technical indicators
+    \item Visual representation of indicator values on stock charts
+    \item Educational content explaining how each indicator works
+    \item Real-time calculation based on current market data
+\end{itemize}
+
+\subsubsection{Trading Strategy Recommendations}
+
+\textbf{Purpose}: Generate intelligent trading recommendations based on technical analysis
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Four Pre-built Strategies}:
+    \begin{itemize}
+        \item \textbf{Trend Following}: Uses SMA crossovers for identifying long-term trends
+        \item \textbf{Mean Reversion}: Combines RSI and Bollinger Bands for short-term reversals
+        \item \textbf{Momentum}: Utilizes MACD and EMA for capturing price momentum
+        \item \textbf{Conservative}: Multi-indicator consensus for risk-averse investors
+    \end{itemize}
+    \item \textbf{Strategy Selection}: Automatic strategy recommendation based on investment horizon (1, 2, or 5 years)
+    \item \textbf{Trading Frequency Recommendations}: Suggests optimal rebalancing frequency (daily, weekly, or monthly) based on strategy type and portfolio characteristics
+    \item \textbf{Signal Generation}: Generates Buy/Hold/Sell signals for each stock in the portfolio
+    \item \textbf{Confidence Scoring}: Provides confidence levels for each recommendation
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Personalized strategy recommendations
+    \item Clear action signals (Buy/Hold/Sell)
+    \item Understanding of why specific recommendations are made
+    \item Optimization for different investment timeframes
+\end{itemize}
+
+\subsubsection{Portfolio Management}
+
+\textbf{Purpose}: Enable users to create, track, and manage stock portfolios
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Portfolio Creation}: Initialize portfolios with up to 20 stocks and specify investment horizon
+    \item \textbf{Portfolio Naming}: Custom names for easy identification
+    \item \textbf{Position Tracking}: Real-time tracking of:
+    \begin{itemize}
+        \item Number of shares held
+        \item Average cost basis
+        \item Current market value
+        \item Unrealized profit/loss (both dollar and percentage)
+    \end{itemize}
+    \item \textbf{Cash Management}: Track available cash balance and initial capital
+    \item \textbf{Portfolio Performance Metrics}:
+    \begin{itemize}
+        \item Total portfolio value (cash $+$ positions)
+        \item Overall profit/loss
+        \item Return on investment (ROI)
+        \item Performance comparison against initial capital
+    \end{itemize}
+    \item \textbf{Multiple Portfolios}: Users can create and manage multiple portfolios simultaneously
+    \item \textbf{Portfolio Viewing}: Detailed view of each portfolio with all positions and performance metrics
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Centralized portfolio tracking
+    \item Real-time valuation of holdings
+    \item Performance monitoring and analysis
+    \item Support for multiple investment strategies
+\end{itemize}
+
+\subsubsection{Virtual Trading System}
+
+\textbf{Purpose}: Allow users to practice trading with virtual money
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Virtual Wallet}: Each user has a virtual wallet with initial balance (\$10,000 default)
+    \item \textbf{Stock Buying}: Purchase stocks at current market prices with virtual funds
+    \item \textbf{Stock Selling}: Sell owned stocks and realize profits/losses
+    \item \textbf{Transaction Tracking}: Complete history of all buy/sell transactions with:
+    \begin{itemize}
+        \item Transaction date and time
+        \item Stock ticker and quantity
+        \item Price per share
+        \item Total transaction value
+        \item Commission and fees
+        \item Realized profit/loss (for sell transactions)
+    \end{itemize}
+    \item \textbf{Holdings Management}: View all current stock holdings with:
+    \begin{itemize}
+        \item Current market value
+        \item Unrealized profit/loss
+        \item Percentage gains/losses
+    \end{itemize}
+    \item \textbf{Fund Deposits}: Ability to add virtual funds to wallet (for testing/demo purposes)
+    \item \textbf{Transaction Filtering}: Filter transactions by:
+    \begin{itemize}
+        \item Transaction type (buy/sell)
+        \item Stock ticker
+        \item Date range
+    \end{itemize}
+    \item \textbf{Performance Statistics}:
+    \begin{itemize}
+        \item Total buy orders and amount
+        \item Total sell orders and amount
+        \item Net cash flow
+        \item Realized profit/loss from closed positions
+    \end{itemize}
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Risk-free trading practice
+    \item Learning trading mechanics without financial risk
+    \item Testing different trading strategies
+    \item Understanding transaction costs and fees
+\end{itemize}
+
+\subsubsection{Stock Data and Market Information}
+
+\textbf{Purpose}: Provide comprehensive stock market data and information
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Real-time Stock Quotes}: Current market prices fetched from Alpha Vantage API
+    \item \textbf{Historical Price Data}: 10 years of historical daily price data stored in database
+    \item \textbf{Stock Search and Validation}: Validate stock tickers before adding to portfolio
+    \item \textbf{Popular Stocks List}: Pre-configured list of 20 popular US stocks
+    \item \textbf{Stock Details Page}: Comprehensive information for each stock including:
+    \begin{itemize}
+        \item Current price and daily change
+        \item Historical price charts
+        \item Technical indicators
+        \item Trading signals
+        \item Company information
+    \end{itemize}
+    \item \textbf{Watchlist}: Maintain a list of stocks to monitor
+    \item \textbf{Daily Price Updates}: Automated daily updates of stock prices via cron jobs
+    \item \textbf{Data Caching}: Aggressive caching to minimize API calls and improve performance
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Access to real-time and historical market data
+    \item Reliable data source (Alpha Vantage API)
+    \item Fast data retrieval through caching
+    \item Comprehensive stock information
+\end{itemize}
+
+\subsubsection{Educational Content}
+
+\textbf{Purpose}: Educate users about technical analysis and trading concepts
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Learn Technical Indicators}: Interactive educational section explaining:
+    \begin{itemize}
+        \item How each indicator works (concept and formula)
+        \item Trading signals generated by each indicator
+        \item Pro tips for using indicators effectively
+    \end{itemize}
+    \item \textbf{Interactive Calculator}: Visual calculator demonstrating indicator calculations with sample data
+    \item \textbf{Step-by-step Navigation}: Guided tour through different indicators
+    \item \textbf{Visual Examples}: Charts and examples showing indicator behavior
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Understanding of technical analysis concepts
+    \item Learning how to interpret trading signals
+    \item Building confidence in using the platform
+    \item Educational resource for trading knowledge
+\end{itemize}
+
+\subsubsection{Stock Recommendations}
+
+\textbf{Purpose}: Provide personalized stock recommendations based on technical analysis
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Individual Stock Analysis}: Get recommendations for specific stocks
+    \item \textbf{Multi-indicator Analysis}: Recommendations based on multiple technical indicators
+    \item \textbf{Confidence Scoring}: Confidence levels for each recommendation
+    \item \textbf{Reasoning Explanation}: Detailed explanation of why a recommendation is made
+    \item \textbf{Strategy-based Recommendations}: Recommendations aligned with selected trading strategy
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Data-driven stock selection
+    \item Understanding of recommendation rationale
+    \item Confidence in trading decisions
+\end{itemize}
+
+\subsubsection{Backtesting}
+
+\textbf{Purpose}: Test trading strategies against historical data
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{API Endpoint}: Backend support for backtesting requests
+    \item \textbf{Historical Simulation}: Simulate trading strategies using past market data
+    \item \textbf{Performance Metrics}: Calculate metrics like CAGR, Sharpe ratio, and maximum drawdown
+\end{itemize}
+
+\subsubsection{Paper Trading}
+
+\textbf{Purpose}: Real-time validation of trading strategies
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{API Endpoint}: Backend support for paper trading sessions
+    \item \textbf{Real-time Tracking}: Track paper trading performance in real-time
+    \item \textbf{Performance Comparison}: Compare paper trading results with backtested expectations
+\end{itemize}
+
+\subsubsection{System Administration and Security}
+
+\textbf{Purpose}: Ensure system security and reliability
+
+\textbf{Features}:
+\begin{itemize}
+    \item \textbf{Rate Limiting}: Protection against API abuse (100 requests/15~min global, 5 requests/15~min for authentication)
+    \item \textbf{Security Headers}: Helmet.js for HTTP security headers
+    \item \textbf{CORS Configuration}: Configurable cross-origin resource sharing
+    \item \textbf{Input Validation}: All user inputs validated before processing
+    \item \textbf{Error Handling}: Comprehensive error handling with user-friendly messages
+    \item \textbf{Logging}: Request logging for debugging and monitoring
+    \item \textbf{Database Connection Management}: Graceful handling of database connection issues with in-memory fallback
+\end{itemize}
+
+\textbf{User Benefits}:
+\begin{itemize}
+    \item Secure platform
+    \item Protection against abuse
+    \item Reliable system operation
+    \item Data integrity
+\end{itemize}
+
+\subsection{Target Users}
+
+The system is designed for:
+
+\begin{enumerate}
+    \item \textbf{Individual Investors}: Retail investors managing personal stock portfolios
+    \item \textbf{Trading Learners}: People learning about stock trading and technical analysis
+    \item \textbf{Strategy Testers}: Investors wanting to test trading strategies before using real money
+    \item \textbf{Portfolio Managers}: Users managing multiple portfolios with different strategies
+\end{enumerate}
+
+\subsection{System Capabilities Summary}
+
+The Horizon Trading Platform successfully provides:
+
+\begin{itemize}
+    \item Complete user authentication and account management
+    \item Real-time stock market data integration
+    \item Five major technical indicators with signal generation
+    \item Four trading strategies with automatic recommendations
+    \item Full portfolio management with position tracking
+    \item Virtual trading system with transaction history
+    \item Educational content for learning technical analysis
+    \item Stock recommendations based on technical analysis
+    \item Comprehensive transaction and performance tracking
+    \item Backtesting framework
+    \item Paper trading validation
+\end{itemize}
+
+The system demonstrates a production-ready implementation of core trading and portfolio management features, providing comprehensive tools for technical analysis, portfolio management, and strategy validation.
+
+% Uncomment if compiling as standalone:
+% \end{document}

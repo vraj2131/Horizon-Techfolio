@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
-  ChevronLeft,
-  ChevronRight,
   BookOpen,
   Brain,
   BarChart3,
@@ -230,37 +228,39 @@ export default function LearnIndicatorsPage() {
         </GlassCard>
 
         {/* Navigation and Indicator Card */}
-        <div className="relative">
+        <div className="flex items-center gap-4 lg:gap-6">
           {/* Left Arrow */}
           <Button
             variant="ghost"
             size="lg"
             onClick={goToPrevious}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 z-10 hidden lg:flex"
+            className="hidden lg:flex shrink-0 w-14 h-14 rounded-xl bg-slate-800/80 border-2 border-slate-600/50 hover:border-blue-500/50 hover:bg-slate-700/80 transition-all shadow-lg hover:shadow-blue-500/20 text-2xl font-bold text-slate-300 hover:text-white"
             disabled={indicators.length === 1}
           >
-            <ChevronLeft className="w-6 h-6" />
+            &lt;
           </Button>
 
           {/* Indicator Card */}
-          <AnimatePresence mode="wait">
-            <IndicatorCard
-              key={currentIndicator.id}
-              indicator={currentIndicator}
-              onShowCalculator={setShowCalculator}
-              showCalculator={showCalculator === currentIndicator.id}
-            />
-          </AnimatePresence>
+          <div className="flex-1 min-w-0">
+            <AnimatePresence mode="wait">
+              <IndicatorCard
+                key={currentIndicator.id}
+                indicator={currentIndicator}
+                onShowCalculator={setShowCalculator}
+                showCalculator={showCalculator === currentIndicator.id}
+              />
+            </AnimatePresence>
+          </div>
 
           {/* Right Arrow */}
           <Button
             variant="ghost"
             size="lg"
             onClick={goToNext}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 z-10 hidden lg:flex"
+            className="hidden lg:flex shrink-0 w-14 h-14 rounded-xl bg-slate-800/80 border-2 border-slate-600/50 hover:border-blue-500/50 hover:bg-slate-700/80 transition-all shadow-lg hover:shadow-blue-500/20 text-2xl font-bold text-slate-300 hover:text-white"
             disabled={indicators.length === 1}
           >
-            <ChevronRight className="w-6 h-6" />
+            &gt;
           </Button>
         </div>
 
@@ -277,7 +277,7 @@ export default function LearnIndicatorsPage() {
             disabled={indicators.length === 1}
             className="flex items-center gap-2"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <span className="text-xl font-bold">&lt;</span>
             Previous
           </Button>
           <span className="text-sm text-slate-400">
@@ -290,7 +290,7 @@ export default function LearnIndicatorsPage() {
             className="flex items-center gap-2"
           >
             Next
-            <ChevronRight className="w-5 h-5" />
+            <span className="text-xl font-bold">&gt;</span>
           </Button>
         </div>
 

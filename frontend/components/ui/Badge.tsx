@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface BadgeProps {
-  variant: 'buy' | 'sell' | 'hold' | 'success' | 'danger' | 'warning' | 'info';
+  variant: 'buy' | 'sell' | 'hold' | 'success' | 'danger' | 'warning' | 'info' | 'secondary';
   children: React.ReactNode;
   showIcon?: boolean;
   animated?: boolean;
@@ -28,7 +28,8 @@ export const Badge: React.FC<BadgeProps> = ({
     success: 'bg-brand-success/10 text-brand-success border border-brand-success/30',
     danger: 'bg-brand-danger/10 text-brand-danger border border-brand-danger/30',
     warning: 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30',
-    info: 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+    info: 'bg-blue-500/10 text-blue-400 border border-blue-500/30',
+    secondary: 'bg-slate-700/50 text-slate-300 border border-slate-600/50'
   };
 
   const getIcon = () => {

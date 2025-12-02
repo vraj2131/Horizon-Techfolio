@@ -1,0 +1,508 @@
+================================================================================
+                    SYSTEM ARCHITECTURE DIAGRAM
+                    Horizon Trading Platform
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PRESENTATION LAYER                                 │
+│                          (Next.js Frontend)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
+│  │   Pages (App)    │  │   Components     │  │  State Management│         │
+│  │                  │  │                  │  │   (Zustand)      │         │
+│  │ • Dashboard      │  │ • UI Components  │  │                  │         │
+│  │ • Trading        │  │ • Trading Forms  │  │ • authStore      │         │
+│  │ • Portfolio      │  │ • Portfolio UI   │  │ • portfolioStore │         │
+│  │ • Transactions   │  │ • Indicators     │  │ • walletStore    │         │
+│  │ • Watchlist      │  │ • Stock Views    │  │                  │         │
+│  │ • Stock Details   │  │                  │  │                  │         │
+│  │ • Learn          │  │                  │  │                  │         │
+│  │ • Recommendations│  │                  │  │                  │         │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
+│           │                      │                      │                  │
+│           └──────────────────────┼──────────────────────┘                  │
+│                                  │                                          │
+│                          ┌───────▼────────┐                                 │
+│                          │  API Client    │                                 │
+│                          │   (Axios)      │                                 │
+│                          │                │                                 │
+│                          │ • auth.ts     │                                 │
+│                          │ • portfolio.ts│                                 │
+│                          │ • stocks.ts   │                                 │
+│                          │ • trading.ts  │                                 │
+│                          └───────┬────────┘                                 │
+│                                  │                                          │
+└──────────────────────────────────┼──────────────────────────────────────────┘
+                                   │
+                                   │ HTTP/REST API
+                                   │ (JSON)
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        APPLICATION LAYER                                      │
+│                        (Express.js Backend)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                         Middleware Stack                            │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │    │
+│  │  │  Helmet  │  │   CORS   │  │  Morgan  │  │  Rate    │          │    │
+│  │  │ (Security)│  │          │  │ (Logging)│  │  Limit   │          │    │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘          │    │
+│  │                                                                     │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐                        │    │
+│  │  │   Auth   │  │Validation │  │  Error   │                        │    │
+│  │  │Middleware│  │Middleware │  │Middleware│                        │    │
+│  │  └──────────┘  └──────────┘  └──────────┘                        │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                          API Routes                                 │    │
+│  │                                                                     │    │
+│  │  /portfolio/*  /user/*  /auth/*  /stocks/*  /wallet/*              │    │
+│  │  /backtest/*   /paper-trading/*  /coupled-trade/*                  │    │
+│  │                                                                     │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        BUSINESS LOGIC LAYER                                   │
+│                           (Services)                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐       │
+│  │ TradingService   │  │IndicatorService  │  │ StrategyService  │       │
+│  │                  │  │                  │  │                  │       │
+│  │ • buyStock()     │  │ • SMA            │  │ • TrendFollowing │       │
+│  │ • sellStock()    │  │ • EMA            │  │ • MeanReversion  │       │
+│  │ • getWallet()    │  │ • RSI             │  │ • Momentum       │       │
+│  │ • getHoldings()  │  │ • MACD            │  │ • Conservative  │       │
+│  │                  │  │ • Bollinger Bands │  │                  │       │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘       │
+│           │                     │                      │                  │
+│  ┌────────▼─────────┐  ┌────────▼─────────┐  ┌────────▼─────────┐       │
+│  │MarketDataProvider│  │PriceDataService  │  │  AuthService     │       │
+│  │                  │  │                  │  │                  │       │
+│  │ • getPrices()    │  │ • getPriceData() │  │ • login()        │       │
+│  │ • getQuote()     │  │ • cacheData()    │  │ • register()     │       │
+│  │ • Rate limiting  │  │ • updateData()   │  │ • verifyToken()  │       │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘       │
+│           │                     │                      │                  │
+│           └─────────────────────┼──────────────────────┘                  │
+│                                 │                                          │
+│  ┌──────────────────────────────▼──────────────┐                          │
+│  │         DailyUpdateService                   │                          │
+│  │         (Background Service)                 │                          │
+│  │         • Scheduled price updates            │                          │
+│  │         • Cron job integration                │                          │
+│  └──────────────────────────────────────────────┘                          │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        DOMAIN MODEL LAYER                                     │
+│                         (Business Objects)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
+│  │ Portfolio│  │ Position  │  │ Security │  │ Strategy │                  │
+│  │          │  │           │  │          │  │          │                  │
+│  │ • cash   │  │ • quantity│  │ • ticker │  │ • name   │                  │
+│  │ • horizon│  │ • avgCost │  │ • name   │  │ • rules  │                  │
+│  │ • rebal()│  │ • P&L     │  │ • validate│  │ • signals│                 │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘                  │
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐                                               │
+│  │Technical │  │   User   │                                               │
+│  │Indicator │  │          │                                               │
+│  │          │  │ • userId │                                               │
+│  │ • compute│  │ • name   │                                               │
+│  │ • signal │  │ • email  │                                               │
+│  └──────────┘  └──────────┘                                               │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        DATA ACCESS LAYER                                      │
+│                        (Database Service)                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                         DBService                                    │    │
+│  │         (Abstraction Layer with In-Memory Fallback)                 │    │
+│  │                                                                     │    │
+│  │  • savePortfolio()     • getUserPortfolios()                       │    │
+│  │  • getPortfolio()      • saveTransaction()                          │    │
+│  │  • updatePortfolio()   • getTransactionHistory()                    │    │
+│  │  • savePriceData()     • getPriceData()                             │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │ Mongoose ODM
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        DATA PERSISTENCE LAYER                                │
+│                        (MongoDB Atlas)                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
+│  │   User   │  │  Wallet  │  │ Portfolio│  │Transaction│                 │
+│  │  Model   │  │  Model   │  │  Model   │  │  Model    │                 │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘                  │
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
+│  │PriceData │  │ Backtest │  │  Paper   │  │          │                  │
+│  │  Model   │  │ Session  │  │ Trading │  │          │                  │
+│  │          │  │  Model   │  │ Session │  │          │                  │
+│  │          │  │          │  │  Model  │  │          │                  │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘                  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        EXTERNAL SERVICES                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                    Alpha Vantage API                                 │    │
+│  │                                                                     │    │
+│  │  • TIME_SERIES_DAILY (Historical data)                             │    │
+│  │  • GLOBAL_QUOTE (Real-time quotes)                                 │    │
+│  │  • Rate Limits: 5 calls/min, 500 calls/day                         │    │
+│  │  • API Key Rotation Support                                         │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                    Cron Job Service                                  │    │
+│  │                    (Daily Updates)                                   │    │
+│  │                                                                     │    │
+│  │  • Scheduled daily price data updates                               │    │
+│  │  • Automated database synchronization                              │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                          DATA FLOW EXAMPLES
+================================================================================
+
+1. USER AUTHENTICATION FLOW:
+   User → Frontend (Login) → API Client → Backend (Auth Middleware) 
+   → AuthService → MongoDB (UserModel) → JWT Token → Frontend (Store)
+
+2. STOCK TRADING FLOW:
+   User → Frontend (Buy/Sell) → API Client → Backend (Validation) 
+   → TradingService → MarketDataProvider → Alpha Vantage API
+   → WalletModel (Update) → TransactionModel (Save) → Frontend (Update UI)
+
+3. PORTFOLIO CREATION FLOW:
+   User → Frontend (Create) → API Client → Backend 
+   → Portfolio Service → Security Model (Validate) 
+   → MarketDataProvider → PriceDataService → MongoDB (PortfolioModel)
+   → Frontend (Display)
+
+4. INDICATOR CALCULATION FLOW:
+   User → Frontend (View Stock) → API Client → Backend 
+   → PriceDataService → MongoDB (PriceDataModel)
+   → IndicatorService (Calculate) → Frontend (Display)
+
+5. DAILY UPDATE FLOW:
+   Cron Job → DailyUpdateService → PriceDataService 
+   → MarketDataProvider → Alpha Vantage API
+   → MongoDB (PriceDataModel) → Cache Update
+
+================================================================================
+                          TECHNOLOGY STACK
+================================================================================
+
+FRONTEND:
+  • Next.js 14+ (React with TypeScript)
+  • Tailwind CSS (Styling)
+  • Zustand (State Management)
+  • Axios (HTTP Client)
+  • Framer Motion (Animations)
+
+BACKEND:
+  • Node.js (Runtime)
+  • Express.js (Web Framework)
+  • JWT (Authentication)
+  • bcrypt (Password Hashing)
+  • express-validator (Validation)
+
+DATABASE:
+  • MongoDB Atlas (Cloud Database)
+  • Mongoose (ODM)
+
+EXTERNAL:
+  • Alpha Vantage API (Market Data)
+  • Node-cron (Scheduling)
+
+INFRASTRUCTURE:
+  • Helmet.js (Security)
+  • CORS (Cross-Origin)
+  • Morgan (Logging)
+  • Compression (Response Compression)
+  • express-rate-limit (Rate Limiting)
+
+================================================================================
+
+
+
+                    SYSTEM ARCHITECTURE DIAGRAM
+                    Horizon Trading Platform
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PRESENTATION LAYER                                 │
+│                          (Next.js Frontend)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
+│  │   Pages (App)    │  │   Components     │  │  State Management│         │
+│  │                  │  │                  │  │   (Zustand)      │         │
+│  │ • Dashboard      │  │ • UI Components  │  │                  │         │
+│  │ • Trading        │  │ • Trading Forms  │  │ • authStore      │         │
+│  │ • Portfolio      │  │ • Portfolio UI   │  │ • portfolioStore │         │
+│  │ • Transactions   │  │ • Indicators     │  │ • walletStore    │         │
+│  │ • Watchlist      │  │ • Stock Views    │  │                  │         │
+│  │ • Stock Details   │  │                  │  │                  │         │
+│  │ • Learn          │  │                  │  │                  │         │
+│  │ • Recommendations│  │                  │  │                  │         │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
+│           │                      │                      │                  │
+│           └──────────────────────┼──────────────────────┘                  │
+│                                  │                                          │
+│                          ┌───────▼────────┐                                 │
+│                          │  API Client    │                                 │
+│                          │   (Axios)      │                                 │
+│                          │                │                                 │
+│                          │ • auth.ts     │                                 │
+│                          │ • portfolio.ts│                                 │
+│                          │ • stocks.ts   │                                 │
+│                          │ • trading.ts  │                                 │
+│                          └───────┬────────┘                                 │
+│                                  │                                          │
+└──────────────────────────────────┼──────────────────────────────────────────┘
+                                   │
+                                   │ HTTP/REST API
+                                   │ (JSON)
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        APPLICATION LAYER                                      │
+│                        (Express.js Backend)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                         Middleware Stack                            │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │    │
+│  │  │  Helmet  │  │   CORS   │  │  Morgan  │  │  Rate    │          │    │
+│  │  │ (Security)│  │          │  │ (Logging)│  │  Limit   │          │    │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘          │    │
+│  │                                                                     │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐                        │    │
+│  │  │   Auth   │  │Validation │  │  Error   │                        │    │
+│  │  │Middleware│  │Middleware │  │Middleware│                        │    │
+│  │  └──────────┘  └──────────┘  └──────────┘                        │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                          API Routes                                 │    │
+│  │                                                                     │    │
+│  │  /portfolio/*  /user/*  /auth/*  /stocks/*  /wallet/*              │    │
+│  │  /backtest/*   /paper-trading/*  /coupled-trade/*                  │    │
+│  │                                                                     │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        BUSINESS LOGIC LAYER                                   │
+│                           (Services)                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐       │
+│  │ TradingService   │  │IndicatorService  │  │ StrategyService  │       │
+│  │                  │  │                  │  │                  │       │
+│  │ • buyStock()     │  │ • SMA            │  │ • TrendFollowing │       │
+│  │ • sellStock()    │  │ • EMA            │  │ • MeanReversion  │       │
+│  │ • getWallet()    │  │ • RSI             │  │ • Momentum       │       │
+│  │ • getHoldings()  │  │ • MACD            │  │ • Conservative  │       │
+│  │                  │  │ • Bollinger Bands │  │                  │       │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘       │
+│           │                     │                      │                  │
+│  ┌────────▼─────────┐  ┌────────▼─────────┐  ┌────────▼─────────┐       │
+│  │MarketDataProvider│  │PriceDataService  │  │  AuthService     │       │
+│  │                  │  │                  │  │                  │       │
+│  │ • getPrices()    │  │ • getPriceData() │  │ • login()        │       │
+│  │ • getQuote()     │  │ • cacheData()    │  │ • register()     │       │
+│  │ • Rate limiting  │  │ • updateData()   │  │ • verifyToken()  │       │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘       │
+│           │                     │                      │                  │
+│           └─────────────────────┼──────────────────────┘                  │
+│                                 │                                          │
+│  ┌──────────────────────────────▼──────────────┐                          │
+│  │         DailyUpdateService                   │                          │
+│  │         (Background Service)                 │                          │
+│  │         • Scheduled price updates            │                          │
+│  │         • Cron job integration                │                          │
+│  └──────────────────────────────────────────────┘                          │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        DOMAIN MODEL LAYER                                     │
+│                         (Business Objects)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
+│  │ Portfolio│  │ Position  │  │ Security │  │ Strategy │                  │
+│  │          │  │           │  │          │  │          │                  │
+│  │ • cash   │  │ • quantity│  │ • ticker │  │ • name   │                  │
+│  │ • horizon│  │ • avgCost │  │ • name   │  │ • rules  │                  │
+│  │ • rebal()│  │ • P&L     │  │ • validate│  │ • signals│                 │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘                  │
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐                                               │
+│  │Technical │  │   User   │                                               │
+│  │Indicator │  │          │                                               │
+│  │          │  │ • userId │                                               │
+│  │ • compute│  │ • name   │                                               │
+│  │ • signal │  │ • email  │                                               │
+│  └──────────┘  └──────────┘                                               │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        DATA ACCESS LAYER                                      │
+│                        (Database Service)                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                         DBService                                    │    │
+│  │         (Abstraction Layer with In-Memory Fallback)                 │    │
+│  │                                                                     │    │
+│  │  • savePortfolio()     • getUserPortfolios()                       │    │
+│  │  • getPortfolio()      • saveTransaction()                          │    │
+│  │  • updatePortfolio()   • getTransactionHistory()                    │    │
+│  │  • savePriceData()     • getPriceData()                             │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   │ Mongoose ODM
+                                   │
+┌──────────────────────────────────▼──────────────────────────────────────────┐
+│                        DATA PERSISTENCE LAYER                                │
+│                        (MongoDB Atlas)                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
+│  │   User   │  │  Wallet  │  │ Portfolio│  │Transaction│                 │
+│  │  Model   │  │  Model   │  │  Model   │  │  Model    │                 │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘                  │
+│                                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
+│  │PriceData │  │ Backtest │  │  Paper   │  │          │                  │
+│  │  Model   │  │ Session  │  │ Trading │  │          │                  │
+│  │          │  │  Model   │  │ Session │  │          │                  │
+│  │          │  │          │  │  Model  │  │          │                  │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘                  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        EXTERNAL SERVICES                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                    Alpha Vantage API                                 │    │
+│  │                                                                     │    │
+│  │  • TIME_SERIES_DAILY (Historical data)                             │    │
+│  │  • GLOBAL_QUOTE (Real-time quotes)                                 │    │
+│  │  • Rate Limits: 5 calls/min, 500 calls/day                         │    │
+│  │  • API Key Rotation Support                                         │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                    Cron Job Service                                  │    │
+│  │                    (Daily Updates)                                   │    │
+│  │                                                                     │    │
+│  │  • Scheduled daily price data updates                               │    │
+│  │  • Automated database synchronization                              │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                          DATA FLOW EXAMPLES
+================================================================================
+
+1. USER AUTHENTICATION FLOW:
+   User → Frontend (Login) → API Client → Backend (Auth Middleware) 
+   → AuthService → MongoDB (UserModel) → JWT Token → Frontend (Store)
+
+2. STOCK TRADING FLOW:
+   User → Frontend (Buy/Sell) → API Client → Backend (Validation) 
+   → TradingService → MarketDataProvider → Alpha Vantage API
+   → WalletModel (Update) → TransactionModel (Save) → Frontend (Update UI)
+
+3. PORTFOLIO CREATION FLOW:
+   User → Frontend (Create) → API Client → Backend 
+   → Portfolio Service → Security Model (Validate) 
+   → MarketDataProvider → PriceDataService → MongoDB (PortfolioModel)
+   → Frontend (Display)
+
+4. INDICATOR CALCULATION FLOW:
+   User → Frontend (View Stock) → API Client → Backend 
+   → PriceDataService → MongoDB (PriceDataModel)
+   → IndicatorService (Calculate) → Frontend (Display)
+
+5. DAILY UPDATE FLOW:
+   Cron Job → DailyUpdateService → PriceDataService 
+   → MarketDataProvider → Alpha Vantage API
+   → MongoDB (PriceDataModel) → Cache Update
+
+================================================================================
+                          TECHNOLOGY STACK
+================================================================================
+
+FRONTEND:
+  • Next.js 14+ (React with TypeScript)
+  • Tailwind CSS (Styling)
+  • Zustand (State Management)
+  • Axios (HTTP Client)
+  • Framer Motion (Animations)
+
+BACKEND:
+  • Node.js (Runtime)
+  • Express.js (Web Framework)
+  • JWT (Authentication)
+  • bcrypt (Password Hashing)
+  • express-validator (Validation)
+
+DATABASE:
+  • MongoDB Atlas (Cloud Database)
+  • Mongoose (ODM)
+
+EXTERNAL:
+  • Alpha Vantage API (Market Data)
+  • Node-cron (Scheduling)
+
+INFRASTRUCTURE:
+  • Helmet.js (Security)
+  • CORS (Cross-Origin)
+  • Morgan (Logging)
+  • Compression (Response Compression)
+  • express-rate-limit (Rate Limiting)
+
+================================================================================
+
+

@@ -30,8 +30,10 @@ const SecuritySchema = new Schema({
 const PortfolioSchema = new Schema({
   portfolioId: { type: String, required: true, unique: true },
   userId: { type: String, required: true, index: true }, // Link portfolio to user
+  name: { type: String, default: null }, // Portfolio name (optional)
   horizon: { type: Number, required: true, enum: [1, 2, 5] },
   cash: { type: Number, default: 100000 },
+  initialCapital: { type: Number, default: null }, // Original investment amount (tracked separately from cash)
   risk_budget: { type: Number, default: 1.0 },
   securities: [SecuritySchema],
   positions: [PositionSchema],
@@ -93,4 +95,6 @@ PortfolioSchema.methods.toPortfolioObject = function() {
 const PortfolioModel = mongoose.model('Portfolio', PortfolioSchema);
 
 module.exports = PortfolioModel;
+
+
 

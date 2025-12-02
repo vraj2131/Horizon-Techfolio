@@ -115,6 +115,106 @@ export default function TransactionsPage() {
 
   const filteredTransactions = applyFilters(transactions);
 
+  // Export transactions to CSV
+  const exportToCSV = () => {
+    if (filteredTransactions.length === 0) {
+      alert('No transactions to export');
+      return;
+    }
+
+    // CSV Headers
+    const headers = [
+      'Date',
+      'Type',
+      'Ticker',
+      'Quantity',
+      'Price',
+      'Amount',
+      'Fees',
+      'Commission',
+      'Status',
+      'Transaction ID'
+    ];
+
+    // Convert transactions to CSV rows
+    const csvRows = filteredTransactions.map((tx: any) => {
+      const date = formatDate(tx.createdAt || tx.timestamp || tx.date || '');
+      const type = (tx.type || '').toUpperCase();
+      const ticker = tx.ticker || '-';
+      const quantity = tx.quantity || '-';
+      const price = tx.price ? (typeof tx.price === 'number' ? tx.price.toFixed(2) : String(tx.price)) : '-';
+      const amount = tx.total || tx.subtotal || 0;
+      // Format amount with sign: negative for buys, positive for sells
+      let amountFormatted: string;
+      if (tx.type === 'buy' || tx.type === 'deposit') {
+        // Buys and deposits are negative (money out)
+        amountFormatted = (-Math.abs(amount)).toFixed(2);
+      } else if (tx.type === 'sell' || tx.type === 'withdrawal') {
+        // Sells and withdrawals are positive (money in)
+        amountFormatted = Math.abs(amount).toFixed(2);
+      } else {
+        // Default: preserve original sign
+        amountFormatted = amount.toFixed(2);
+      }
+      const fees = tx.fees || 0;
+      const feesFormatted = fees.toFixed(2);
+      const commission = tx.commission || 0;
+      const commissionFormatted = commission.toFixed(2);
+      const status = tx.status || 'completed';
+      const transactionId = tx.transactionId || tx._id || '-';
+
+      return [
+        date,
+        type,
+        ticker,
+        quantity,
+        price,
+        amountFormatted,
+        feesFormatted,
+        commissionFormatted,
+        status,
+        transactionId
+      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+    });
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(','),
+      ...csvRows
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    URL.revokeObjectURL(url);
+  };
+
+  // Debug: Log sell transactions to see what fields they have
+  if (process.env.NODE_ENV === 'development') {
+    const sellTxs = transactions.filter((tx: any) => tx.type === 'sell');
+    if (sellTxs.length > 0) {
+      console.log('Sell transactions:', sellTxs.map((tx: any) => ({
+        ticker: tx.ticker,
+        quantity: tx.quantity,
+        price: tx.price,
+        realizedProfitLoss: tx.realizedProfitLoss,
+        profitLoss: tx.profitLoss,
+        costBasis: tx.costBasis,
+        total: tx.total
+      })));
+    }
+  }
+
   // Calculate statistics
   const totalBuyTransactions = transactions.filter((tx: any) => tx.type === 'buy').length;
   const totalSellTransactions = transactions.filter((tx: any) => tx.type === 'sell').length;
@@ -124,6 +224,91 @@ export default function TransactionsPage() {
   const totalSellAmount = transactions
     .filter((tx: any) => tx.type === 'sell')
     .reduce((sum: number, tx: any) => sum + (tx.total || tx.subtotal || 0), 0);
+  // Calculate realized P&L from sell transactions
+  // We need to match sell transactions with their corresponding buy transactions
+  // to calculate the actual realized P&L
+  const realizedPnL = (() => {
+    // First, try to use the realizedProfitLoss field if available
+    let hasDirectPnL = false;
+    const directPnL = transactions
+      .filter((tx: any) => tx.type === 'sell')
+      .reduce((sum: number, tx: any) => {
+        const pnl = tx.realizedProfitLoss ?? tx.profitLoss ?? tx.realizedPnl;
+        if (pnl !== null && pnl !== undefined && !isNaN(pnl)) {
+          hasDirectPnL = true;
+          return sum + Number(pnl);
+        }
+        return sum;
+      }, 0);
+    
+    // If we have direct P&L values from backend, use them
+    if (hasDirectPnL) {
+      return directPnL;
+    }
+    
+    // If no direct P&L field available, calculate by matching buys and sells
+    // Group transactions by ticker
+    const tickerGroups: { [key: string]: any[] } = {};
+    transactions.forEach((tx: any) => {
+      if (tx.ticker) {
+        if (!tickerGroups[tx.ticker]) {
+          tickerGroups[tx.ticker] = [];
+        }
+        tickerGroups[tx.ticker].push(tx);
+      }
+    });
+    
+    let totalRealizedPnL = 0;
+    
+    // For each ticker, calculate realized P&L using FIFO
+    Object.keys(tickerGroups).forEach(ticker => {
+      const tickerTxs = tickerGroups[ticker].sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || a.timestamp || a.date || 0).getTime();
+        const dateB = new Date(b.createdAt || b.timestamp || b.date || 0).getTime();
+        return dateA - dateB;
+      });
+      
+      const buyQueue: Array<{ quantity: number; price: number; fees: number }> = [];
+      
+      tickerTxs.forEach((tx: any) => {
+        const quantity = tx.quantity || 0;
+        const price = tx.price || 0;
+        const fees = (tx.commission || 0) + (tx.fees || 0);
+        
+        if (tx.type === 'buy') {
+          buyQueue.push({ quantity, price, fees });
+        } else if (tx.type === 'sell' && buyQueue.length > 0) {
+          let remainingSell = quantity;
+          let sellPnL = 0;
+          
+          while (remainingSell > 0 && buyQueue.length > 0) {
+            const buy = buyQueue[0];
+            const sellQuantity = Math.min(remainingSell, buy.quantity);
+            const costBasis = buy.price;
+            const sellPrice = price;
+            const buyFees = (buy.fees / buy.quantity) * sellQuantity;
+            const sellFees = (fees / quantity) * sellQuantity;
+            
+            // Realized P&L = (Sell Price - Buy Price) * Quantity - Fees
+            const pnl = (sellPrice - costBasis) * sellQuantity - buyFees - sellFees;
+            sellPnL += pnl;
+            
+            remainingSell -= sellQuantity;
+            buy.quantity -= sellQuantity;
+            buy.fees -= buyFees;
+            
+            if (buy.quantity <= 0) {
+              buyQueue.shift();
+            }
+          }
+          
+          totalRealizedPnL += sellPnL;
+        }
+      });
+    });
+    
+    return totalRealizedPnL;
+  })();
 
   if (isInitializing) {
     return (
@@ -157,10 +342,8 @@ export default function TransactionsPage() {
             
             <Button
               variant="ghost"
-              onClick={() => {
-                // TODO: Export to CSV functionality
-                alert('Export functionality coming soon!');
-              }}
+              onClick={exportToCSV}
+              disabled={filteredTransactions.length === 0}
             >
               <Download className="w-4 h-4 mr-2" />
               Export
@@ -171,7 +354,7 @@ export default function TransactionsPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <GlassCard className="p-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-blue-500/10 rounded-lg">
@@ -213,10 +396,32 @@ export default function TransactionsPage() {
               <div className="p-2 bg-purple-500/10 rounded-lg">
                 <TrendingUp className="w-5 h-5 text-purple-400" />
               </div>
-              <p className="text-sm text-slate-400">Net Proceeds</p>
+              <p className="text-sm text-slate-400">Net Cash Flow</p>
             </div>
             <p className={`text-3xl font-bold ${totalSellAmount - totalBuyAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {formatCurrency(totalSellAmount - totalBuyAmount)}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {totalSellAmount - totalBuyAmount >= 0 ? 'Net inflow' : 'Net outflow'}
+            </p>
+          </GlassCard>
+
+          <GlassCard className="p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-indigo-500/10 rounded-lg">
+                {realizedPnL >= 0 ? (
+                  <TrendingUp className="w-5 h-5 text-green-400" />
+                ) : (
+                  <TrendingDown className="w-5 h-5 text-red-400" />
+                )}
+              </div>
+              <p className="text-sm text-slate-400">Realized P&L</p>
+            </div>
+            <p className={`text-3xl font-bold ${realizedPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {realizedPnL >= 0 ? '+' : ''}{formatCurrency(realizedPnL)}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              From closed positions
             </p>
           </GlassCard>
         </div>

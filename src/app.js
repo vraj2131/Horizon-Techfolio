@@ -151,9 +151,27 @@ app.get('/api', (req, res) => {
   });
 });
 
+// ==================== Mount API Routes ====================
+// Mount routes for both server startup and testing
+// In server.js, routes are mounted again (which is fine - Express handles duplicates)
+// This ensures tests can use the app instance with routes already mounted
+const apiRoutes = require('./api/routes/index');
+app.use('/', apiRoutes);
+
+// ==================== Error Handling ====================
+// Add error handlers for testing (they'll be added again in server.js, which is fine)
+// This ensures tests get proper JSON error responses instead of HTML
+const { notFound, errorHandler } = require('./api/middleware/error.middleware');
+
+// 404 handler - must be after all routes
+app.use(notFound);
+
+// Global error handler - must be last
+app.use(errorHandler);
+
 // ==================== Routes Will Be Mounted Here ====================
-// Routes will be imported and mounted in server.js after database connection
-// Note: 404 and error handlers are also added in server.js AFTER routes
+// Routes and error handlers are now mounted above for testing purposes
+// In server.js, routes and error handlers are mounted again after database connection (which is fine)
 
 module.exports = app;
 

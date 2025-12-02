@@ -315,7 +315,7 @@ export default function CoupledTradesPage() {
                           <p className="text-xs text-slate-400">Potential Return</p>
                         </div>
                         <p className={`text-2xl font-bold ${rec.potentialReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {rec.potentialReturn >= 0 ? '+' : ''}{formatPercent(rec.potentialReturn)}
+                          {formatPercent(rec.potentialReturn)}
                         </p>
                       </div>
                     </div>

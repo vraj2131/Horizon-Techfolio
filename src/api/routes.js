@@ -28,7 +28,7 @@ const tradingService = new TradingService();
  */
 async function initializePortfolio(body) {
   try {
-    const { tickers, horizon, userId } = body;
+    const { tickers, horizon, userId, portfolioName, initialCapital } = body;
     
     // Validate userId is provided
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
@@ -139,7 +139,9 @@ async function initializePortfolio(body) {
     });
 
     // Create portfolio with validated userId
-    const portfolio = new Portfolio(validSecurities, parseInt(horizon));
+    const portfolio = new Portfolio(validSecurities, parseInt(horizon), initialCapital || null);
+    portfolio.name = portfolioName || null; // Store portfolio name if provided
+    portfolio.initialCapital = initialCapital || portfolio.cash || null; // Track initial capital separately
     const portfolioId = `portfolio_${Date.now()}`;
     await DBService.savePortfolio(portfolioId, portfolio, userId);
 
@@ -148,6 +150,7 @@ async function initializePortfolio(body) {
     return {
       portfolioId,
       userId: userId,
+      name: portfolioName || null,
       horizon: parseInt(horizon),
       securities: validSecurities.map(s => s.get_metadata()),
       validationResults,
@@ -1096,7 +1099,7 @@ async function getStockRecommendation(body) {
     }
 
     const { isDBConnected } = require('../db/connection');
-    const IndicatorService = require('../services/IndicatorService');
+    const { IndicatorService } = require('../services/IndicatorService');
     const StrategyService = require('../services/StrategyService');
     const PriceDataService = require('../services/PriceDataService');
     

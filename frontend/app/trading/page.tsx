@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { useAuthStore } from '@/lib/store/authStore';
 import { useWalletStore } from '@/lib/store/walletStore';
@@ -28,6 +28,7 @@ import { useToast } from '@/lib/hooks/useToast';
 
 export default function TradingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated, verifyToken } = useAuthStore();
   const { 
     wallet, 
@@ -46,6 +47,29 @@ export default function TradingPage() {
   const [quantity, setQuantity] = useState('');
   const [selectedHolding, setSelectedHolding] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Read URL parameters and pre-fill form
+  useEffect(() => {
+    const urlTicker = searchParams.get('ticker');
+    const urlAction = searchParams.get('action');
+    
+    if (urlTicker) {
+      const tickerUpper = urlTicker.toUpperCase();
+      setTicker(tickerUpper);
+      
+      // If action is 'sell', also select the holding if it exists
+      if (urlAction === 'sell' && holdings.length > 0) {
+        const holding = holdings.find((h: any) => h.ticker === tickerUpper);
+        if (holding) {
+          setSelectedHolding(holding);
+        }
+      }
+    }
+    
+    if (urlAction === 'buy' || urlAction === 'sell') {
+      setActiveTab(urlAction);
+    }
+  }, [searchParams, holdings]);
 
   useEffect(() => {
     const initializeTradingPage = async () => {
@@ -227,7 +251,7 @@ export default function TradingPage() {
   );
 
   const totalHoldingsValue = (Array.isArray(holdings) ? holdings : []).reduce((sum: number, h: any) => 
-    sum + (h.marketValue || 0), 0
+    sum + (h.totalValue || h.marketValue || 0), 0
   );
   const totalPnL = (Array.isArray(holdings) ? holdings : []).reduce((sum: number, h: any) => 
     sum + (h.profitLoss || 0), 0
@@ -340,7 +364,7 @@ export default function TradingPage() {
               {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
             </p>
             <p className={`text-xs mt-2 ${totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {totalPnL >= 0 ? '+' : ''}{formatPercent((totalHoldingsValue - totalPnL) > 0 ? (totalPnL / (totalHoldingsValue - totalPnL)) * 100 : 0)}
+              {formatPercent((totalHoldingsValue - totalPnL) > 0 ? (totalPnL / (totalHoldingsValue - totalPnL)) * 100 : 0)}
             </p>
           </GlassCard>
         </div>
@@ -554,7 +578,7 @@ export default function TradingPage() {
                             <div className={`text-sm ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
                               {isPositive ? '+' : ''}{formatCurrency(pnl)}
                               <span className="text-xs ml-1">
-                                ({isPositive ? '+' : ''}{formatPercent(pnlPercent)})
+                                ({formatPercent(pnlPercent)})
                               </span>
                             </div>
                           </div>

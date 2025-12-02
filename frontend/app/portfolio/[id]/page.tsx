@@ -189,7 +189,7 @@ export default function PortfolioDetailPage() {
               </p>
             </div>
             <p className={`text-sm mt-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-              {isPositive ? '+' : ''}{formatPercent(pnlPercent)}
+              {formatPercent(pnlPercent)}
             </p>
           </GlassCard>
 
@@ -313,7 +313,7 @@ function OverviewTab({ portfolio }: { portfolio: any }) {
                             {isPositionPositive ? '+' : ''}{formatCurrency(positionPnL)}
                           </div>
                           <div className="text-xs">
-                            {isPositionPositive ? '+' : ''}{formatPercent(positionPnLPercent)}
+                            {formatPercent(positionPnLPercent)}
                           </div>
                         </div>
                       </td>

@@ -1,0 +1,480 @@
+================================================================================
+                    ENTITY-RELATIONSHIP DIAGRAM
+                    Horizon Trading Platform
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              USER                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: userId (String, unique)                                             │
+│     name (String)                                                       │
+│     email (String, optional)                                           │
+│     passwordHash (String, optional)                                    │
+│     createdAt (Date)                                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │ 1:1
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              WALLET                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ FK: userId (String, unique) ────────────────────┐                      │
+│     balance (Number, default: 10000)            │                      │
+│     currency (String, default: 'USD')           │                      │
+│     reservedFunds (Number)                      │                      │
+│     totalDeposited (Number)                     │                      │
+│     totalInvested (Number)                      │                      │
+│     totalProfitLoss (Number)                    │                      │
+│     totalTrades (Number)                        │                      │
+│     winningTrades (Number)                     │                      │
+│     losingTrades (Number)                      │                      │
+│     status (String: active/frozen/closed)       │                      │
+│     lastTransactionAt (Date)                    │                      │
+│     createdAt, updatedAt                        │                      │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │ 1:N
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          TRANSACTION                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ FK: userId (String) ────────────────────────────┐                      │
+│ FK: portfolioId (String, optional) ────────────┼──┐                   │
+│     type (String: buy/sell/deposit/etc)          │  │                   │
+│     ticker (String, required for buy/sell)       │  │                   │
+│     quantity (Number)                            │  │                   │
+│     price (Number)                               │  │                   │
+│     subtotal (Number)                           │  │                   │
+│     commission (Number)                         │  │                   │
+│     fees (Number)                               │  │                   │
+│     total (Number)                               │  │                   │
+│     balanceBefore (Number)                      │  │                   │
+│     balanceAfter (Number)                       │  │                   │
+│     status (String)                             │  │                   │
+│     executionType (String)                      │  │                   │
+│     orderSource (String)                        │  │                   │
+│     costBasis (Number, optional)                │  │                   │
+│     realizedProfitLoss (Number, optional)       │  │                   │
+│     notes (String)                              │  │                   │
+│     createdAt, updatedAt                        │  │                   │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │
+         │ 1:N
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            PORTFOLIO                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: portfolioId (String, unique)                                       │
+│ FK: userId (String) ────────────────────────────────────────────────────┼─┐
+│     name (String, optional)                                             │ │
+│     horizon (Number: 1, 2, or 5)                                       │ │
+│     cash (Number, default: 100000)                                     │ │
+│     initialCapital (Number, optional)                                   │ │
+│     risk_budget (Number, default: 1.0)                                 │ │
+│     securities[] (Array of Security objects)                           │ │
+│     positions[] (Array of Position objects)                             │ │
+│     createdAt, lastUpdated                                              │ │
+│                                                                          │ │
+│     ┌──────────────────────────────────────┐                            │ │
+│     │ Embedded: SECURITY                   │                            │ │
+│     │   ticker (String)                    │                            │ │
+│     │   name, exchange, sector (String)    │                            │ │
+│     │   inception_date (String)            │                            │ │
+│     └──────────────────────────────────────┘                            │ │
+│                                                                          │ │
+│     ┌──────────────────────────────────────┐                            │ │
+│     │ Embedded: POSITION                    │                            │ │
+│     │   ticker (String)                     │                            │ │
+│     │   side (String: long/short)          │                            │ │
+│     │   quantity (Number)                  │                            │ │
+│     │   averageCost (Number)               │                            │ │
+│     │   currentPrice (Number)               │                            │ │
+│     │   marketValue (Number)               │                            │ │
+│     │   profitLoss (Number)                │                            │ │
+│     │   profitLossPercent (Number)         │                            │ │
+│     └──────────────────────────────────────┘                            │ │
+└─────────────────────────────────────────────────────────────────────────┘
+         │                                                                 │
+         │ 1:N                                                             │
+         │                                                                 │
+         ├─────────────────────────────────────────────────────────────────┘
+         │
+         │ 1:1
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PAPER_TRADING_SESSION                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ UK: portfolioId (String, unique) ────────────────────┐                 │
+│     status (String: active/paused/stopped)            │                 │
+│     initialValue (Number, default: 100000)            │                 │
+│     currentValue (Number)                              │                 │
+│     totalReturn (Number)                               │                 │
+│     dailyReturn (Number)                               │                 │
+│     paperTrades[] (Array of PaperTrade objects)        │                 │
+│     performance (Object)                               │                 │
+│     startedAt, lastUpdated                             │                 │
+│                                                         │                 │
+│     ┌──────────────────────────────────────┐          │                 │
+│     │ Embedded: PAPER_TRADE                 │          │                 │
+│     │   ticker (String)                     │          │                 │
+│     │   side (String: buy/sell)             │          │                 │
+│     │   shares (Number)                     │          │                 │
+│     │   price (Number)                      │          │                 │
+│     │   timestamp (Date)                    │          │                 │
+│     └──────────────────────────────────────┘          │                 │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │
+         │ 1:N
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        BACKTEST_SESSION                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: sessionId (String, unique)                                           │
+│ FK: portfolioId (String) ────────────────────────────┐                 │
+│     startDate (String)                                 │                 │
+│     endDate (String)                                  │                 │
+│     strategy (String)                                 │                 │
+│     status (String: running/completed/failed)         │                 │
+│     metrics (Object):                                  │                 │
+│       - cagr (Number)                                 │                 │
+│       - sharpe (Number)                               │                 │
+│       - maxDrawdown (Number)                          │                 │
+│       - totalReturn (Number)                           │                 │
+│       - winRate (Number)                              │                 │
+│       - totalTrades (Number)                           │                 │
+│     createdAt, completedAt                            │                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          PRICE_DATA                                      │
+│                    (Standalone Entity)                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ UK: ticker (String, unique)                                             │
+│     interval (String, default: 'daily')                                 │
+│     data[] (Array of PricePoint objects)                                │
+│     firstDate (String)                                                  │
+│     lastDate (String)                                                   │
+│     lastUpdated (Date)                                                  │
+│     totalDataPoints (Number)                                            │
+│                                                                          │
+│     ┌──────────────────────────────────────┐                            │
+│     │ Embedded: PRICE_POINT                │                            │
+│     │   date (String)                       │                            │
+│     │   open (Number)                       │                            │
+│     │   high (Number)                       │                            │
+│     │   low (Number)                       │                            │
+│     │   close (Number)                     │                            │
+│     │   volume (Number)                    │                            │
+│     └──────────────────────────────────────┘                            │
+└─────────────────────────────────────────────────────────────────────────┘
+         ▲
+         │
+         │ (Referenced by ticker - logical relationship, not FK)
+         │
+         └─── Used by: Transaction.ticker, Portfolio.positions[].ticker
+
+================================================================================
+                          RELATIONSHIP SUMMARY
+================================================================================
+
+1. USER ──(1:1)──> WALLET
+   - One user has exactly one wallet
+   - Relationship: userId (unique in Wallet)
+
+2. USER ──(1:N)──> PORTFOLIO
+   - One user can have multiple portfolios
+   - Relationship: userId in Portfolio
+
+3. USER ──(1:N)──> TRANSACTION
+   - One user can have many transactions
+   - Relationship: userId in Transaction
+
+4. PORTFOLIO ──(1:N)──> TRANSACTION (optional)
+   - One portfolio can have many transactions
+   - Relationship: portfolioId in Transaction (optional)
+
+5. PORTFOLIO ──(1:N)──> BACKTEST_SESSION
+   - One portfolio can have multiple backtest sessions
+   - Relationship: portfolioId in BacktestSession
+
+6. PORTFOLIO ──(1:1)──> PAPER_TRADING_SESSION
+   - One portfolio can have one paper trading session
+   - Relationship: portfolioId (unique in PaperTradingSession)
+
+7. PRICE_DATA (Standalone)
+   - Referenced by ticker symbol (logical relationship)
+   - Used by Portfolio positions and Transaction tickers
+
+================================================================================
+                          DATA SOURCES
+================================================================================
+
+HISTORICAL MARKET DATA:
+  - Source: Alpha Vantage API
+  - Endpoint: TIME_SERIES_DAILY
+  - Storage: MongoDB PriceData collection
+  - Coverage: 10 years of historical data for 20 stocks
+  - Update Frequency: Daily (via cron job)
+  - Rate Limits: 5 calls/minute, 500 calls/day (free tier)
+
+REAL-TIME MARKET DATA:
+  - Source: Alpha Vantage API
+  - Endpoint: GLOBAL_QUOTE
+  - Usage: Fetched on-demand for current stock prices
+  - Caching: Aggressive caching to minimize API calls
+  - Rate Limits: Same as historical data
+
+================================================================================
+
+
+
+                    ENTITY-RELATIONSHIP DIAGRAM
+                    Horizon Trading Platform
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              USER                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: userId (String, unique)                                             │
+│     name (String)                                                       │
+│     email (String, optional)                                           │
+│     passwordHash (String, optional)                                    │
+│     createdAt (Date)                                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │ 1:1
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              WALLET                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ FK: userId (String, unique) ────────────────────┐                      │
+│     balance (Number, default: 10000)            │                      │
+│     currency (String, default: 'USD')           │                      │
+│     reservedFunds (Number)                      │                      │
+│     totalDeposited (Number)                     │                      │
+│     totalInvested (Number)                      │                      │
+│     totalProfitLoss (Number)                    │                      │
+│     totalTrades (Number)                        │                      │
+│     winningTrades (Number)                     │                      │
+│     losingTrades (Number)                      │                      │
+│     status (String: active/frozen/closed)       │                      │
+│     lastTransactionAt (Date)                    │                      │
+│     createdAt, updatedAt                        │                      │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │ 1:N
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          TRANSACTION                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ FK: userId (String) ────────────────────────────┐                      │
+│ FK: portfolioId (String, optional) ────────────┼──┐                   │
+│     type (String: buy/sell/deposit/etc)          │  │                   │
+│     ticker (String, required for buy/sell)       │  │                   │
+│     quantity (Number)                            │  │                   │
+│     price (Number)                               │  │                   │
+│     subtotal (Number)                           │  │                   │
+│     commission (Number)                         │  │                   │
+│     fees (Number)                               │  │                   │
+│     total (Number)                               │  │                   │
+│     balanceBefore (Number)                      │  │                   │
+│     balanceAfter (Number)                       │  │                   │
+│     status (String)                             │  │                   │
+│     executionType (String)                      │  │                   │
+│     orderSource (String)                        │  │                   │
+│     costBasis (Number, optional)                │  │                   │
+│     realizedProfitLoss (Number, optional)       │  │                   │
+│     notes (String)                              │  │                   │
+│     createdAt, updatedAt                        │  │                   │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │
+         │ 1:N
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            PORTFOLIO                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: portfolioId (String, unique)                                       │
+│ FK: userId (String) ────────────────────────────────────────────────────┼─┐
+│     name (String, optional)                                             │ │
+│     horizon (Number: 1, 2, or 5)                                       │ │
+│     cash (Number, default: 100000)                                     │ │
+│     initialCapital (Number, optional)                                   │ │
+│     risk_budget (Number, default: 1.0)                                 │ │
+│     securities[] (Array of Security objects)                           │ │
+│     positions[] (Array of Position objects)                             │ │
+│     createdAt, lastUpdated                                              │ │
+│                                                                          │ │
+│     ┌──────────────────────────────────────┐                            │ │
+│     │ Embedded: SECURITY                   │                            │ │
+│     │   ticker (String)                    │                            │ │
+│     │   name, exchange, sector (String)    │                            │ │
+│     │   inception_date (String)            │                            │ │
+│     └──────────────────────────────────────┘                            │ │
+│                                                                          │ │
+│     ┌──────────────────────────────────────┐                            │ │
+│     │ Embedded: POSITION                    │                            │ │
+│     │   ticker (String)                     │                            │ │
+│     │   side (String: long/short)          │                            │ │
+│     │   quantity (Number)                  │                            │ │
+│     │   averageCost (Number)               │                            │ │
+│     │   currentPrice (Number)               │                            │ │
+│     │   marketValue (Number)               │                            │ │
+│     │   profitLoss (Number)                │                            │ │
+│     │   profitLossPercent (Number)         │                            │ │
+│     └──────────────────────────────────────┘                            │ │
+└─────────────────────────────────────────────────────────────────────────┘
+         │                                                                 │
+         │ 1:N                                                             │
+         │                                                                 │
+         ├─────────────────────────────────────────────────────────────────┘
+         │
+         │ 1:1
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PAPER_TRADING_SESSION                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ UK: portfolioId (String, unique) ────────────────────┐                 │
+│     status (String: active/paused/stopped)            │                 │
+│     initialValue (Number, default: 100000)            │                 │
+│     currentValue (Number)                              │                 │
+│     totalReturn (Number)                               │                 │
+│     dailyReturn (Number)                               │                 │
+│     paperTrades[] (Array of PaperTrade objects)        │                 │
+│     performance (Object)                               │                 │
+│     startedAt, lastUpdated                             │                 │
+│                                                         │                 │
+│     ┌──────────────────────────────────────┐          │                 │
+│     │ Embedded: PAPER_TRADE                 │          │                 │
+│     │   ticker (String)                     │          │                 │
+│     │   side (String: buy/sell)             │          │                 │
+│     │   shares (Number)                     │          │                 │
+│     │   price (Number)                      │          │                 │
+│     │   timestamp (Date)                    │          │                 │
+│     └──────────────────────────────────────┘          │                 │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         │
+         │ 1:N
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        BACKTEST_SESSION                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: sessionId (String, unique)                                           │
+│ FK: portfolioId (String) ────────────────────────────┐                 │
+│     startDate (String)                                 │                 │
+│     endDate (String)                                  │                 │
+│     strategy (String)                                 │                 │
+│     status (String: running/completed/failed)         │                 │
+│     metrics (Object):                                  │                 │
+│       - cagr (Number)                                 │                 │
+│       - sharpe (Number)                               │                 │
+│       - maxDrawdown (Number)                          │                 │
+│       - totalReturn (Number)                           │                 │
+│       - winRate (Number)                              │                 │
+│       - totalTrades (Number)                           │                 │
+│     createdAt, completedAt                            │                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          PRICE_DATA                                      │
+│                    (Standalone Entity)                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PK: _id (ObjectId)                                                      │
+│ UK: ticker (String, unique)                                             │
+│     interval (String, default: 'daily')                                 │
+│     data[] (Array of PricePoint objects)                                │
+│     firstDate (String)                                                  │
+│     lastDate (String)                                                   │
+│     lastUpdated (Date)                                                  │
+│     totalDataPoints (Number)                                            │
+│                                                                          │
+│     ┌──────────────────────────────────────┐                            │
+│     │ Embedded: PRICE_POINT                │                            │
+│     │   date (String)                       │                            │
+│     │   open (Number)                       │                            │
+│     │   high (Number)                       │                            │
+│     │   low (Number)                       │                            │
+│     │   close (Number)                     │                            │
+│     │   volume (Number)                    │                            │
+│     └──────────────────────────────────────┘                            │
+└─────────────────────────────────────────────────────────────────────────┘
+         ▲
+         │
+         │ (Referenced by ticker - logical relationship, not FK)
+         │
+         └─── Used by: Transaction.ticker, Portfolio.positions[].ticker
+
+================================================================================
+                          RELATIONSHIP SUMMARY
+================================================================================
+
+1. USER ──(1:1)──> WALLET
+   - One user has exactly one wallet
+   - Relationship: userId (unique in Wallet)
+
+2. USER ──(1:N)──> PORTFOLIO
+   - One user can have multiple portfolios
+   - Relationship: userId in Portfolio
+
+3. USER ──(1:N)──> TRANSACTION
+   - One user can have many transactions
+   - Relationship: userId in Transaction
+
+4. PORTFOLIO ──(1:N)──> TRANSACTION (optional)
+   - One portfolio can have many transactions
+   - Relationship: portfolioId in Transaction (optional)
+
+5. PORTFOLIO ──(1:N)──> BACKTEST_SESSION
+   - One portfolio can have multiple backtest sessions
+   - Relationship: portfolioId in BacktestSession
+
+6. PORTFOLIO ──(1:1)──> PAPER_TRADING_SESSION
+   - One portfolio can have one paper trading session
+   - Relationship: portfolioId (unique in PaperTradingSession)
+
+7. PRICE_DATA (Standalone)
+   - Referenced by ticker symbol (logical relationship)
+   - Used by Portfolio positions and Transaction tickers
+
+================================================================================
+                          DATA SOURCES
+================================================================================
+
+HISTORICAL MARKET DATA:
+  - Source: Alpha Vantage API
+  - Endpoint: TIME_SERIES_DAILY
+  - Storage: MongoDB PriceData collection
+  - Coverage: 10 years of historical data for 20 stocks
+  - Update Frequency: Daily (via cron job)
+  - Rate Limits: 5 calls/minute, 500 calls/day (free tier)
+
+REAL-TIME MARKET DATA:
+  - Source: Alpha Vantage API
+  - Endpoint: GLOBAL_QUOTE
+  - Usage: Fetched on-demand for current stock prices
+  - Caching: Aggressive caching to minimize API calls
+  - Rate Limits: Same as historical data
+
+================================================================================
+
+
