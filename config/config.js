@@ -128,6 +128,15 @@ module.exports = {
     options: {
       // Modern MongoDB driver options (useNewUrlParser and useUnifiedTopology are deprecated)
     }
+  },
+
+  // Gemini API Configuration
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || null,
+    baseUrl: 'https://generativelanguage.googleapis.com/v1', // Using v1 API (v1beta is deprecated)
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash', // Using gemini-2.5-flash (fast and efficient)
+    timeout: parseInt(process.env.GEMINI_TIMEOUT) || 30000, // 30 seconds
+    enabled: process.env.GEMINI_ENABLED !== 'false' // Enable by default if API key is present
   }
 };
 

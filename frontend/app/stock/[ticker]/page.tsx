@@ -559,6 +559,80 @@ export default function StockDetailPage() {
                 </div>
               </GlassCard>
 
+              {/* Gemini AI-Enhanced Insights */}
+              {insights.geminiInsights && insights.geminiEnabled ? (
+                <GlassCard className="p-6 border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-blue-500/5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg">
+                      <Sparkles className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">AI-Enhanced Insights</h3>
+                      <p className="text-xs text-slate-400">Powered by Gemini AI</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {insights.geminiInsights.enhancedExplanation && (
+                      <div className="p-4 bg-slate-800/50 rounded-lg">
+                        <p className="text-sm font-medium text-white mb-2 flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-blue-400" />
+                          Enhanced Explanation
+                        </p>
+                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                          {insights.geminiInsights.enhancedExplanation}
+                        </p>
+                      </div>
+                    )}
+
+                    {insights.geminiInsights.riskAssessment && (
+                      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                        <p className="text-sm font-medium text-amber-400 mb-2 flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-amber-400" />
+                          Risk Assessment
+                        </p>
+                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                          {insights.geminiInsights.riskAssessment}
+                        </p>
+                      </div>
+                    )}
+
+                    {insights.geminiInsights.actionableInsights && (
+                      <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                        <p className="text-sm font-medium text-green-400 mb-2 flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-green-400" />
+                          Actionable Insights
+                        </p>
+                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                          {insights.geminiInsights.actionableInsights}
+                        </p>
+                      </div>
+                    )}
+
+                    {insights.geminiInsights.educationalContext && (
+                      <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <p className="text-sm font-medium text-blue-400 mb-2 flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-blue-400" />
+                          Educational Context
+                        </p>
+                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                          {insights.geminiInsights.educationalContext}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+              ) : insights.geminiEnabled === false ? (
+                <GlassCard className="p-4 border border-slate-700/50 bg-slate-800/20">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <Sparkles className="w-4 h-4" />
+                    <p className="text-sm">
+                      AI-Enhanced Insights are currently unavailable. Please ensure GEMINI_API_KEY is set in your backend .env file.
+                    </p>
+                  </div>
+                </GlassCard>
+              ) : null}
+
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-slate-700/50">
                 <Button

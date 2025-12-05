@@ -24,6 +24,19 @@ async function startServer() {
     console.log('🚀 Starting HorizonTrader Server...');
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     
+    // ==================== Check Gemini Service ====================
+    try {
+      const GeminiService = require('../services/GeminiService');
+      const geminiService = new GeminiService();
+      if (geminiService.isEnabled()) {
+        console.log('✅ Gemini AI service is enabled and ready');
+      } else {
+        console.log('⚠️  Gemini AI service is disabled');
+      }
+    } catch (error) {
+      console.log('⚠️  Could not initialize Gemini service:', error.message);
+    }
+    
     // ==================== Database Connection ====================
     console.log('\n📊 Connecting to database...');
     await connectDB();

@@ -170,6 +170,13 @@ export interface IndicatorSignal {
   allSignals?: string[];
 }
 
+export interface GeminiInsights {
+  enhancedExplanation?: string;
+  riskAssessment?: string;
+  actionableInsights?: string;
+  educationalContext?: string;
+}
+
 export interface StockRecommendationResponse {
   ticker: string;
   currentPrice: number;
@@ -187,6 +194,8 @@ export interface StockRecommendationResponse {
   reason: string;
   indicators: Record<string, IndicatorSignal>;
   timestamp: string;
+  geminiInsights?: GeminiInsights;
+  geminiEnabled?: boolean;
 }
 
 /**

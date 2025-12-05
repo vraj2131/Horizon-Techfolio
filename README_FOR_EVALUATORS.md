@@ -75,6 +75,9 @@ MONGODB_URI=your_mongodb_connection_string_here
 ALPHA_VANTAGE_API_KEY=your_api_key_here
 ALPHA_VANTAGE_API_KEY_2=your_secondary_key_here (optional)
 
+# Gemini API Key (optional - for AI-enhanced insights in stock recommendations)
+GEMINI_API_KEY=your_gemini_api_key_here
+
 # JWT Secret (generate a random string)
 JWT_SECRET=your_random_secret_string_here
 
@@ -102,11 +105,17 @@ ENABLE_DAILY_UPDATES=false
    - Copy your API key
    - Note: The system can run tests without this, but some features require it
 
-3. **JWT_SECRET**: 
+3. **GEMINI_API_KEY** (Optional):
+   - Sign up at https://makersuite.google.com/app/apikey (Google AI Studio)
+   - Copy your API key
+   - Note: This enables AI-enhanced insights in the "Generate Insights" feature
+   - The system works without this, but insights will be basic (no AI enhancement)
+
+4. **JWT_SECRET**: 
    - Generate any random string (e.g., `openssl rand -base64 32`)
    - Or use any secure random string
 
-4. **CORS_ORIGIN**: 
+5. **CORS_ORIGIN**: 
    - Keep as `http://localhost:3001` (default frontend port)
 
 ### Step 5: Verify Installation
@@ -451,6 +460,9 @@ MONGODB_URI=your_mongodb_connection_string_here
 ALPHA_VANTAGE_API_KEY=your_api_key_here
 ALPHA_VANTAGE_API_KEY_2=your_secondary_key_here (optional)
 
+# Gemini API Key (optional - for AI-enhanced insights in stock recommendations)
+GEMINI_API_KEY=your_gemini_api_key_here
+
 # JWT Secret (generate a random string)
 JWT_SECRET=your_random_secret_string_here
 
@@ -478,11 +490,17 @@ ENABLE_DAILY_UPDATES=false
    - Copy your API key
    - Note: The system can run tests without this, but some features require it
 
-3. **JWT_SECRET**: 
+3. **GEMINI_API_KEY** (Optional):
+   - Sign up at https://makersuite.google.com/app/apikey (Google AI Studio)
+   - Copy your API key
+   - Note: This enables AI-enhanced insights in the "Generate Insights" feature
+   - The system works without this, but insights will be basic (no AI enhancement)
+
+4. **JWT_SECRET**: 
    - Generate any random string (e.g., `openssl rand -base64 32`)
    - Or use any secure random string
 
-4. **CORS_ORIGIN**: 
+5. **CORS_ORIGIN**: 
    - Keep as `http://localhost:3001` (default frontend port)
 
 ### Step 5: Verify Installation

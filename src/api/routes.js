@@ -1102,6 +1102,7 @@ async function getStockRecommendation(body) {
     const { IndicatorService } = require('../services/IndicatorService');
     const StrategyService = require('../services/StrategyService');
     const PriceDataService = require('../services/PriceDataService');
+    const GeminiService = require('../services/GeminiService');
     
     if (!isDBConnected()) {
       throw new Error('Database not connected');
@@ -1144,6 +1145,10 @@ async function getStockRecommendation(body) {
     const indicatorResults = {};
     const indicatorSignals = {};
     
+    console.log(`📊 Calculating indicators for ${tickerUpper} using ${strategy.name} strategy (${horizonNum}-year horizon)`);
+    console.log(`📊 Strategy indicators:`, strategy.indicators.map(i => `${i.type}(${JSON.stringify(i.params)})`).join(', '));
+    console.log(`📊 Price data points: ${priceData.length}`);
+    
     for (const indicatorConfig of strategy.indicators) {
       try {
         const indicator = IndicatorService.createIndicator(
@@ -1153,6 +1158,10 @@ async function getStockRecommendation(body) {
         
         const values = indicator.compute(priceData);
         const signals = indicator.getAllSignals();
+        
+        if (!values || (Array.isArray(values) && values.length === 0)) {
+          throw new Error(`Indicator computation returned empty values`);
+        }
         
         const latestIndex = Array.isArray(values) 
           ? (values.length > 0 ? values.length - 1 : 0)
@@ -1173,16 +1182,23 @@ async function getStockRecommendation(body) {
         };
         
         indicatorSignals[indicatorConfig.type] = signals;
+        console.log(`✅ ${indicatorConfig.type}: ${latestSignal} signal calculated successfully`);
       } catch (error) {
-        console.warn(`Failed to calculate ${indicatorConfig.type} for ${tickerUpper}:`, error.message);
+        console.warn(`⚠️  Failed to calculate ${indicatorConfig.type} for ${tickerUpper} (${strategy.name} strategy):`, error.message);
+        console.warn(`   Error details:`, error.stack?.substring(0, 200));
         indicatorResults[indicatorConfig.type] = {
           type: indicatorConfig.type,
           error: error.message,
-          signal: 'hold'
+          signal: 'hold',
+          params: indicatorConfig.params
         };
         indicatorSignals[indicatorConfig.type] = ['hold'];
       }
     }
+    
+    const successfulIndicators = Object.values(indicatorResults).filter(r => !r.error).length;
+    const totalIndicators = strategy.indicators.length;
+    console.log(`📊 Indicator calculation complete: ${successfulIndicators}/${totalIndicators} successful`);
 
     // Generate final signal using strategy rules
     const finalSignal = strategy.applyRules(indicatorSignals, priceData);
@@ -1199,7 +1215,8 @@ async function getStockRecommendation(body) {
       latestPrice
     );
 
-    return {
+    // Prepare base response
+    const baseResponse = {
       ticker: tickerUpper,
       currentPrice: latestPrice,
       horizon: horizonNum,
@@ -1217,6 +1234,81 @@ async function getStockRecommendation(body) {
       indicators: indicatorResults,
       timestamp: new Date().toISOString()
     };
+
+    // Generate Gemini-enhanced insights (non-blocking, with fallback)
+    try {
+      const geminiService = new GeminiService();
+      if (geminiService.isEnabled()) {
+        console.log(`🤖 Generating Gemini insights for ${tickerUpper}...`);
+        
+        const geminiInsights = await geminiService.generateInsights({
+          ticker: tickerUpper,
+          currentPrice: latestPrice,
+          horizon: horizonNum,
+          riskTolerance,
+          strategyName: strategy.name,
+          strategyDescription: strategy.getStrategyDescription(),
+          finalRecommendation: finalSignal,
+          confidence: confidence,
+          indicators: indicatorResults,
+          recommendationText,
+          reason
+        });
+
+        if (geminiInsights && geminiInsights.insights) {
+          // Ensure insights is an object, not a string
+          let insightsObj = geminiInsights.insights;
+          
+          // If it's a string, try to parse it as JSON
+          if (typeof insightsObj === 'string') {
+            try {
+              insightsObj = JSON.parse(insightsObj);
+              console.log(`📝 Parsed string response as JSON`);
+            } catch (parseError) {
+              console.warn(`⚠️  Could not parse insights string:`, parseError.message);
+              // Use fallback structure
+              insightsObj = {
+                enhancedExplanation: insightsObj,
+                riskAssessment: '',
+                actionableInsights: '',
+                educationalContext: ''
+              };
+            }
+          }
+          
+          // Ensure we have the expected structure
+          if (typeof insightsObj === 'object' && insightsObj !== null) {
+            baseResponse.geminiInsights = {
+              enhancedExplanation: insightsObj.enhancedExplanation || insightsObj.explanation || '',
+              riskAssessment: insightsObj.riskAssessment || insightsObj.risks || '',
+              actionableInsights: insightsObj.actionableInsights || insightsObj.insights || insightsObj.recommendations || '',
+              educationalContext: insightsObj.educationalContext || insightsObj.context || ''
+            };
+            baseResponse.geminiEnabled = true;
+            console.log(`✅ Gemini insights generated for ${tickerUpper}`);
+            console.log(`   Enhanced Explanation: ${baseResponse.geminiInsights.enhancedExplanation ? 'Yes (' + baseResponse.geminiInsights.enhancedExplanation.length + ' chars)' : 'No'}`);
+            console.log(`   Risk Assessment: ${baseResponse.geminiInsights.riskAssessment ? 'Yes (' + baseResponse.geminiInsights.riskAssessment.length + ' chars)' : 'No'}`);
+            console.log(`   Actionable Insights: ${baseResponse.geminiInsights.actionableInsights ? 'Yes (' + baseResponse.geminiInsights.actionableInsights.length + ' chars)' : 'No'}`);
+          } else {
+            baseResponse.geminiEnabled = false;
+            console.log(`⚠️  Gemini insights not available for ${tickerUpper} (invalid object structure)`);
+          }
+        } else {
+          baseResponse.geminiEnabled = false;
+          console.log(`⚠️  Gemini insights not available for ${tickerUpper} (null or invalid response)`);
+        }
+      } else {
+        baseResponse.geminiEnabled = false;
+        console.log(`⚠️  Gemini service is disabled for ${tickerUpper}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error generating Gemini insights for ${tickerUpper}:`, error.message);
+      console.error(`   Stack: ${error.stack}`);
+      // Don't fail the request if Gemini fails - just mark as disabled
+      baseResponse.geminiEnabled = false;
+    }
+
+    return baseResponse;
   } catch (error) {
     console.error('Error getting stock recommendation:', error.message);
     throw error;
