@@ -103,6 +103,7 @@ export default function PortfolioDetailPage() {
     );
   }
 
+  const positionsValue = (selectedPortfolio.positions || []).reduce((sum, pos) => sum + (pos.marketValue || 0), 0);
   const pnl = (selectedPortfolio.currentValue || 0) - (selectedPortfolio.initialCapital || 0);
   const pnlPercent = selectedPortfolio.initialCapital > 0
     ? ((selectedPortfolio.currentValue || 0) - selectedPortfolio.initialCapital) / selectedPortfolio.initialCapital * 100
@@ -170,6 +171,13 @@ export default function PortfolioDetailPage() {
           </GlassCard>
 
           <GlassCard className="p-6">
+            <p className="text-sm text-slate-400 mb-2">Invested (Positions)</p>
+            <p className="text-3xl font-bold text-white">
+              {formatCurrency(positionsValue || 0)}
+            </p>
+          </GlassCard>
+
+          <GlassCard className="p-6">
             <p className="text-sm text-slate-400 mb-2">Initial Capital</p>
             <p className="text-3xl font-bold text-white">
               {formatCurrency(selectedPortfolio.initialCapital || 0)}
@@ -190,13 +198,6 @@ export default function PortfolioDetailPage() {
             </div>
             <p className={`text-sm mt-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
               {formatPercent(pnlPercent)}
-            </p>
-          </GlassCard>
-
-          <GlassCard className="p-6">
-            <p className="text-sm text-slate-400 mb-2">Positions</p>
-            <p className="text-3xl font-bold text-white">
-              {selectedPortfolio.positions?.length || 0}
             </p>
           </GlassCard>
         </div>
@@ -403,13 +404,21 @@ function StrategyTab({ strategy, isLoading }: { strategy: any; isLoading: boolea
       {strategy ? (
         <div className="space-y-4">
           <div>
-            <p className="text-sm text-slate-400 mb-1">Strategy Type</p>
-            <Badge variant="primary">{strategy.type || 'N/A'}</Badge>
+            <p className="text-sm text-slate-400 mb-1">Strategy</p>
+            <Badge variant="primary">
+              {strategy.name || strategy.type || 'N/A'}
+            </Badge>
           </div>
           {strategy.description && (
             <div>
               <p className="text-sm text-slate-400 mb-1">Description</p>
               <p className="text-white">{strategy.description}</p>
+            </div>
+          )}
+          {strategy.frequency && (
+            <div>
+              <p className="text-sm text-slate-400 mb-1">Rebalance / Check</p>
+              <p className="text-white">{strategy.frequency}</p>
             </div>
           )}
           {strategy.indicators && strategy.indicators.length > 0 && (

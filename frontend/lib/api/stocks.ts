@@ -171,10 +171,21 @@ export interface IndicatorSignal {
 }
 
 export interface GeminiInsights {
+  recommendation?: 'BUY' | 'SELL' | 'HOLD';
+  confidence?: number;
   enhancedExplanation?: string;
   riskAssessment?: string;
   actionableInsights?: string;
   educationalContext?: string;
+}
+
+export interface RecommendationComparison {
+  calculated: 'BUY' | 'SELL' | 'HOLD';
+  calculatedConfidence: number;
+  gemini: 'BUY' | 'SELL' | 'HOLD';
+  geminiConfidence: number;
+  match: boolean;
+  agreement: 'Agree' | 'Disagree';
 }
 
 export interface StockRecommendationResponse {
@@ -196,6 +207,7 @@ export interface StockRecommendationResponse {
   timestamp: string;
   geminiInsights?: GeminiInsights;
   geminiEnabled?: boolean;
+  recommendationComparison?: RecommendationComparison;
 }
 
 /**

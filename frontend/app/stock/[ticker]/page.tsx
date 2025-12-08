@@ -559,6 +559,77 @@ export default function StockDetailPage() {
                 </div>
               </GlassCard>
 
+              {/* Recommendation Comparison */}
+              {insights.recommendationComparison && insights.geminiEnabled ? (
+                <GlassCard className="p-6 border-2 border-cyan-500/30 bg-gradient-to-br from-cyan-500/5 to-blue-500/5 mb-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg">
+                      <BarChart3 className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Recommendation Comparison</h3>
+                      <p className="text-xs text-slate-400">Calculated vs AI Analysis</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="p-4 bg-slate-800/50 rounded-lg">
+                      <p className="text-xs text-slate-400 mb-1">Calculated Recommendation</p>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={insights.recommendationComparison.calculated === 'BUY' ? 'success' : 
+                                   insights.recommendationComparison.calculated === 'SELL' ? 'danger' : 'secondary'}
+                          className="text-sm font-semibold"
+                        >
+                          {insights.recommendationComparison.calculated}
+                        </Badge>
+                        <span className="text-xs text-slate-400">
+                          {(insights.recommendationComparison.calculatedConfidence * 100).toFixed(0)}% confidence
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 bg-slate-800/50 rounded-lg">
+                      <p className="text-xs text-slate-400 mb-1">AI (Gemini) Recommendation</p>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={insights.recommendationComparison.gemini === 'BUY' ? 'success' : 
+                                   insights.recommendationComparison.gemini === 'SELL' ? 'danger' : 'secondary'}
+                          className="text-sm font-semibold"
+                        >
+                          {insights.recommendationComparison.gemini}
+                        </Badge>
+                        <span className="text-xs text-slate-400">
+                          {(insights.recommendationComparison.geminiConfidence * 100).toFixed(0)}% confidence
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`p-3 rounded-lg flex items-center gap-2 ${
+                    insights.recommendationComparison.match 
+                      ? 'bg-green-500/10 border border-green-500/20' 
+                      : 'bg-amber-500/10 border border-amber-500/20'
+                  }`}>
+                    {insights.recommendationComparison.match ? (
+                      <>
+                        <TrendingUp className="w-4 h-4 text-green-400" />
+                        <span className="text-sm text-green-400 font-medium">
+                          Recommendations Match - Both suggest {insights.recommendationComparison.calculated}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-4 h-4 text-amber-400" />
+                        <span className="text-sm text-amber-400 font-medium">
+                          Recommendations Differ - Calculated: {insights.recommendationComparison.calculated}, AI: {insights.recommendationComparison.gemini}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </GlassCard>
+              ) : null}
+
               {/* Gemini AI-Enhanced Insights */}
               {insights.geminiInsights && insights.geminiEnabled ? (
                 <GlassCard className="p-6 border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-blue-500/5">
@@ -568,7 +639,7 @@ export default function StockDetailPage() {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-white">AI-Enhanced Insights</h3>
-                      <p className="text-xs text-slate-400">Powered by Gemini AI</p>
+                      <p className="text-xs text-slate-400">Powered by Gemini AI - Independent Analysis</p>
                     </div>
                   </div>
                   

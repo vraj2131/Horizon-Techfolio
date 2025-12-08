@@ -283,9 +283,77 @@ const validateTransactionHistory = [
   validate
 ];
 
+/**
+ * Validation chains for custom portfolio creation
+ */
+const validateCustomPortfolio = [
+  body('tickers')
+    .isArray({ min: 1, max: 10 })
+    .withMessage('Tickers must be an array with 1-10 items'),
+  body('tickers.*')
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 10 })
+    .withMessage('Each ticker must be a string between 1-10 characters'),
+  body('horizon')
+    .isIn(['1', '2', '5', 1, 2, 5])
+    .withMessage('Horizon must be 1, 2, or 5 years'),
+  body('userId')
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('portfolioName')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Portfolio name must be between 1-100 characters'),
+  body('initialCapital')
+    .optional()
+    .isFloat({ min: 100, max: 10000000 })
+    .withMessage('Initial capital must be between $100 and $10,000,000'),
+  validate
+];
+
+/**
+ * Validation chains for curated portfolio creation
+ */
+const validateCuratedPortfolio = [
+  body('horizon')
+    .isIn(['1', '2', '5', 1, 2, 5])
+    .withMessage('Horizon must be 1, 2, or 5 years'),
+  body('portfolioType')
+    .isIn(['growth', 'balanced', 'defensive', 'Growth', 'Balanced', 'Defensive'])
+    .withMessage('Portfolio type must be growth, balanced, or defensive'),
+  body('userId')
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('initialCapital')
+    .isFloat({ min: 100, max: 10000000 })
+    .withMessage('Initial capital must be between $100 and $10,000,000'),
+  validate
+];
+
+/**
+ * Validation chains for curated options query
+ */
+const validateCuratedOptionsQuery = [
+  query('horizon')
+    .optional()
+    .isIn(['1', '2', '5'])
+    .withMessage('Horizon must be 1, 2, or 5'),
+  validate
+];
+
 module.exports = {
   validate,
   validatePortfolioCreation,
+  validateCustomPortfolio,
+  validateCuratedPortfolio,
+  validateCuratedOptionsQuery,
   validateUserCreation,
   validateUserLogin,
   validateTokenVerification,

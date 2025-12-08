@@ -30,13 +30,12 @@ class TradingService {
 
   /**
    * Get wallet details with portfolio value
+   * Creates a wallet automatically if one doesn't exist
    */
   async getWalletDetails(userId) {
     try {
-      const wallet = await WalletModel.findByUserId(userId);
-      if (!wallet) {
-        throw new Error('Wallet not found');
-      }
+      // Get or create wallet - ensures every user has a wallet
+      const wallet = await WalletModel.getOrCreateWallet(userId);
 
       // Get user's portfolios to calculate total holdings value
       const portfolios = await PortfolioModel.find({ userId });

@@ -39,6 +39,21 @@ class SMAIndicator extends TechnicalIndicator {
       return 'sell';
     }
     
+    // For Trend Following: if price is significantly above/below SMA, signal trend direction
+    // This helps avoid constant HOLD when price is clearly trending
+    const priceToSMARatio = currentPrice / currentSMA;
+    const threshold = 0.02; // 2% threshold to avoid noise
+    
+    // Price significantly above SMA = bullish trend (buy signal)
+    if (priceToSMARatio > (1 + threshold)) {
+      return 'buy';
+    }
+    
+    // Price significantly below SMA = bearish trend (sell signal)
+    if (priceToSMARatio < (1 - threshold)) {
+      return 'sell';
+    }
+    
     return 'hold';
   }
 }

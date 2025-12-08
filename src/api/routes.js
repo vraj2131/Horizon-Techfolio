@@ -15,6 +15,7 @@ const dailyUpdateService = require('../services/DailyUpdateService');
 const PriceDataModel = require('../db/models/PriceDataModel');
 const { isDBConnected } = require('../db/connection');
 const config = require('../../config/config');
+const { getCuratedPortfolio, getPortfoliosByHorizon, getAllCuratedPortfolios, getAvailableHorizons, getPortfolioTypes } = require('../../config/curatedPortfolios');
 // Note: BacktestSession, CoupledTrade, and PaperTradingService will be implemented in later phases
 
 const strategyService = new StrategyService();
@@ -163,6 +164,395 @@ async function initializePortfolio(body) {
 }
 
 /**
+ * Create a custom portfolio with user-selected tickers
+ * POST /portfolio/custom
+ * Body: { tickers: string[], horizon: 1|2|5, userId: string, portfolioName?: string, initialCapital?: number }
+ */
+async function createCustomPortfolio(body) {
+  try {
+    const { tickers, horizon, userId, portfolioName, initialCapital } = body;
+    
+    // Validate userId is provided
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      throw new Error('userId is required and must be a valid string');
+    }
+
+    // Validate userId exists in database
+    const user = await DBService.getUser(userId);
+    if (!user) {
+      throw new Error(`User with userId "${userId}" not found. Please create the user first using POST /user`);
+    }
+    
+    if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
+      throw new Error('Tickers array is required');
+    }
+    
+    if (!horizon || !['1', '2', '5'].includes(horizon.toString())) {
+      throw new Error('Horizon must be 1, 2, or 5 years');
+    }
+
+    if (tickers.length > 10) {
+      throw new Error('Maximum 10 tickers allowed for custom portfolios');
+    }
+
+    // Validate initial capital
+    const capital = initialCapital || config.trading.initialCapital;
+    if (capital < 100) {
+      throw new Error('Initial capital must be at least $100');
+    }
+
+    console.log(`Creating custom portfolio for user ${userId} with ${tickers.length} tickers for ${horizon}-year horizon`);
+
+    // Validate all tickers
+    const securities = [];
+    const validationResults = [];
+    const knownTickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'JNJ', 'V', 'WMT', 'PG', 'UNH', 'HD', 'MA', 'DIS', 'BAC', 'XOM', 'CVX', 'NFLX', 'AMD', 'CRM', 'KO', 'PEP', 'VZ', 'MRK', 'MMM', 'BRK-B'];
+
+    for (const ticker of tickers) {
+      const tickerUpper = ticker.toUpperCase();
+      let isValid = false;
+      let validationNote = '';
+      
+      try {
+        const security = new Security(ticker);
+        
+        // Check database first
+        if (isDBConnected()) {
+          const priceDataDoc = await PriceDataModel.findOne({ ticker: tickerUpper, interval: 'daily' });
+          if (priceDataDoc && priceDataDoc.data && Array.isArray(priceDataDoc.data) && priceDataDoc.data.length > 0) {
+            isValid = true;
+            validationNote = `Database (${priceDataDoc.data.length} records)`;
+          }
+        }
+        
+        // Check known tickers
+        if (!isValid && knownTickers.includes(tickerUpper)) {
+          isValid = true;
+          validationNote = 'Known ticker';
+        }
+        
+        // Try API validation
+        if (!isValid) {
+          try {
+            isValid = await security.validate_symbol();
+            if (isValid) validationNote = 'API validation';
+          } catch (apiError) {
+            // Continue with validation results
+          }
+        }
+        
+        if (isValid) {
+          securities.push(security);
+          validationResults.push({ ticker: tickerUpper, status: 'valid', note: validationNote });
+        } else {
+          validationResults.push({ ticker: tickerUpper, status: 'invalid', error: 'Symbol not found' });
+        }
+      } catch (error) {
+        validationResults.push({ ticker: tickerUpper, status: 'error', error: error.message });
+      }
+    }
+
+    if (securities.length === 0) {
+      throw new Error(`No valid tickers found. Validation results: ${JSON.stringify(validationResults)}`);
+    }
+
+    // Create portfolio with all cash (no automatic allocation for custom portfolios)
+    const portfolio = new Portfolio(securities, parseInt(horizon), capital);
+    portfolio.name = portfolioName || 'Custom Portfolio';
+    portfolio.type = 'custom';
+    portfolio.initialCapital = capital;
+    
+    const portfolioId = `portfolio_custom_${Date.now()}`;
+    await DBService.savePortfolio(portfolioId, portfolio, userId);
+
+    console.log(`Custom portfolio ${portfolioId} created with ${securities.length} securities`);
+
+    return {
+      portfolioId,
+      userId,
+      type: 'custom',
+      name: portfolio.name,
+      horizon: parseInt(horizon),
+      initialCapital: capital,
+      cash: capital,
+      securities: securities.map(s => s.get_metadata()),
+      positions: securities.map(s => ({
+        ticker: s.ticker,
+        shares: 0,
+        avgCost: 0,
+        value: 0
+      })),
+      validationResults,
+      message: `Custom portfolio created with ${securities.length} securities. Ready for manual trading.`
+    };
+  } catch (error) {
+    console.error('Custom portfolio creation error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Create a curated portfolio with equal-weight allocation
+ * POST /portfolio/curated
+ * Body: { horizon: 1|2|5, portfolioType: 'growth'|'balanced'|'defensive', userId: string, initialCapital: number }
+ */
+async function createCuratedPortfolio(body) {
+  try {
+    const { horizon, portfolioType, userId, initialCapital } = body;
+    
+    // Validate userId
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      throw new Error('userId is required and must be a valid string');
+    }
+
+    const user = await DBService.getUser(userId);
+    if (!user) {
+      throw new Error(`User with userId "${userId}" not found. Please create the user first using POST /user`);
+    }
+    
+    // Validate horizon
+    if (!horizon || !['1', '2', '5'].includes(horizon.toString())) {
+      throw new Error('Horizon must be 1, 2, or 5 years');
+    }
+
+    // Validate portfolio type
+    const validTypes = ['growth', 'balanced', 'defensive'];
+    if (!portfolioType || !validTypes.includes(portfolioType.toLowerCase())) {
+      throw new Error('Portfolio type must be growth, balanced, or defensive');
+    }
+
+    // Validate initial capital
+    const capital = initialCapital || config.trading.initialCapital;
+    if (capital < 100) {
+      throw new Error('Initial capital must be at least $100');
+    }
+
+    // Get curated portfolio configuration
+    const curatedConfig = getCuratedPortfolio(horizon, portfolioType.toLowerCase());
+    if (!curatedConfig) {
+      throw new Error(`Curated portfolio not found for horizon ${horizon} and type ${portfolioType}`);
+    }
+
+    console.log(`Creating curated ${curatedConfig.name} portfolio for user ${userId}`);
+
+    // Create securities from curated tickers
+    const securities = [];
+    const tickerPrices = new Map();
+    const tickerErrors = [];
+
+    for (const ticker of curatedConfig.tickers) {
+      try {
+        const security = new Security(ticker);
+        securities.push(security);
+        
+        // Get latest price for allocation
+        const latestPriceData = await priceDataService.getLatestPrice(ticker);
+        if (latestPriceData && latestPriceData.close) {
+          tickerPrices.set(ticker, latestPriceData.close);
+        } else {
+          tickerErrors.push({ ticker, error: 'No price data available' });
+        }
+      } catch (error) {
+        tickerErrors.push({ ticker, error: error.message });
+      }
+    }
+
+    // Check we have enough valid tickers with prices
+    const validTickers = Array.from(tickerPrices.keys());
+    if (validTickers.length === 0) {
+      throw new Error(`No price data available for any tickers. Cannot perform allocation. Errors: ${JSON.stringify(tickerErrors)}`);
+    }
+
+    // Sort tickers by price (cheapest first) for round-robin allocation
+    const sortedTickers = validTickers.sort((a, b) => tickerPrices.get(a) - tickerPrices.get(b));
+    const numStocks = sortedTickers.length;
+    
+    // Create portfolio
+    const portfolio = new Portfolio(securities, parseInt(horizon), capital);
+    portfolio.name = curatedConfig.name;
+    portfolio.type = 'curated';
+    portfolio.curatedId = curatedConfig.id;
+    portfolio.curatedType = portfolioType.toLowerCase();
+    portfolio.initialCapital = capital;
+    
+    // Track shares bought per ticker
+    const sharesByTicker = new Map();
+    sortedTickers.forEach(ticker => sharesByTicker.set(ticker, 0));
+    
+    let totalInvested = 0;
+    let remainingCash = capital;
+    let roundNumber = 0;
+    const maxRounds = 100; // Safety limit
+    
+    console.log(`\n📊 Round-robin allocation for ${curatedConfig.name} with $${capital}`);
+    console.log(`   Stocks (sorted by price): ${sortedTickers.map(t => `${t}($${tickerPrices.get(t).toFixed(2)})`).join(', ')}`);
+    
+    // Round-robin allocation: buy 1 share of each stock per round until we can't afford any
+    while (roundNumber < maxRounds) {
+      roundNumber++;
+      let boughtAnyThisRound = false;
+      
+      for (const ticker of sortedTickers) {
+        const price = tickerPrices.get(ticker);
+        
+        // Check if we can afford 1 share
+        if (remainingCash >= price) {
+          try {
+            portfolio.executeTrade(ticker, 'buy', 1, price);
+            sharesByTicker.set(ticker, sharesByTicker.get(ticker) + 1);
+            remainingCash -= price;
+            totalInvested += price;
+            boughtAnyThisRound = true;
+            console.log(`   Round ${roundNumber}: Bought 1 ${ticker} @ $${price.toFixed(2)} (remaining: $${remainingCash.toFixed(2)})`);
+          } catch (tradeError) {
+            console.warn(`   Failed to buy ${ticker}:`, tradeError.message);
+          }
+        }
+      }
+      
+      // If we couldn't buy any stock this round, we're done
+      if (!boughtAnyThisRound) {
+        console.log(`   Round ${roundNumber}: Cannot afford any more shares. Stopping.`);
+        break;
+      }
+    }
+    
+    // Build allocations array from final shares
+    const allocations = [];
+    for (const ticker of sortedTickers) {
+      const shares = sharesByTicker.get(ticker);
+      const price = tickerPrices.get(ticker);
+      
+      if (shares > 0) {
+        const investedAmount = shares * price;
+        allocations.push({
+          ticker,
+          shares,
+          pricePerShare: price,
+          investedAmount: parseFloat(investedAmount.toFixed(2)),
+          targetAllocation: parseFloat((100 / numStocks).toFixed(2)),
+          actualAllocation: 0 // Will be calculated after
+        });
+      } else {
+        // Stock couldn't be bought at all
+        tickerErrors.push({ 
+          ticker, 
+          error: `Price $${price.toFixed(2)} exceeds remaining capital after other allocations` 
+        });
+      }
+    }
+
+    // Calculate actual allocation percentages
+    for (const alloc of allocations) {
+      alloc.actualAllocation = totalInvested > 0 
+        ? parseFloat(((alloc.investedAmount / totalInvested) * 100).toFixed(2))
+        : 0;
+    }
+
+    const residualCash = portfolio.cash;
+    const portfolioId = `portfolio_curated_${Date.now()}`;
+    await DBService.savePortfolio(portfolioId, portfolio, userId);
+
+    console.log(`\n✅ Curated portfolio ${portfolioId} created:`);
+    console.log(`   Total invested: $${totalInvested.toFixed(2)}`);
+    console.log(`   Residual cash: $${residualCash.toFixed(2)}`);
+    console.log(`   Stocks allocated: ${allocations.length}/${numStocks}`);
+    console.log(`   Allocation rounds: ${roundNumber}`);
+
+    return {
+      portfolioId,
+      userId,
+      type: 'curated',
+      curatedOption: {
+        id: curatedConfig.id,
+        name: curatedConfig.name,
+        description: curatedConfig.description,
+        type: curatedConfig.type,
+        riskLevel: curatedConfig.riskLevel,
+        rebalanceFrequency: curatedConfig.rebalanceFrequency
+      },
+      horizon: parseInt(horizon),
+      initialCapital: capital,
+      totalInvested: parseFloat(totalInvested.toFixed(2)),
+      residualCash: parseFloat(residualCash.toFixed(2)),
+      allocations,
+      allocationRounds: roundNumber,
+      tickerErrors: tickerErrors.length > 0 ? tickerErrors : undefined,
+      summary: {
+        stocksAllocated: allocations.length,
+        totalStocksInPortfolio: curatedConfig.tickers.length,
+        averageSharesPerStock: allocations.length > 0 
+          ? parseFloat((allocations.reduce((sum, a) => sum + a.shares, 0) / allocations.length).toFixed(2))
+          : 0,
+        investmentEfficiency: parseFloat(((totalInvested / capital) * 100).toFixed(2))
+      },
+      message: `Curated "${curatedConfig.name}" portfolio created with round-robin allocation across ${allocations.length} stocks in ${roundNumber} rounds.`
+    };
+  } catch (error) {
+    console.error('Curated portfolio creation error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get available curated portfolio options
+ * GET /portfolio/curated/options
+ * Query: { horizon?: 1|2|5 }
+ */
+async function getCuratedPortfolioOptions(horizon = null) {
+  try {
+    if (horizon) {
+      // Get options for specific horizon
+      const options = getPortfoliosByHorizon(horizon);
+      if (!options) {
+        throw new Error(`No curated portfolios found for horizon ${horizon} years`);
+      }
+      
+      return {
+        horizon: parseInt(horizon),
+        options: Object.values(options).map(opt => ({
+          id: opt.id,
+          name: opt.name,
+          description: opt.description,
+          type: opt.type,
+          tickers: opt.tickers,
+          riskLevel: opt.riskLevel,
+          expectedVolatility: opt.expectedVolatility,
+          rebalanceFrequency: opt.rebalanceFrequency
+        }))
+      };
+    } else {
+      // Get all options grouped by horizon
+      const horizons = getAvailableHorizons();
+      const allOptions = {};
+      
+      for (const h of horizons) {
+        const options = getPortfoliosByHorizon(h);
+        allOptions[`${h}year`] = Object.values(options).map(opt => ({
+          id: opt.id,
+          name: opt.name,
+          description: opt.description,
+          type: opt.type,
+          tickers: opt.tickers,
+          riskLevel: opt.riskLevel,
+          expectedVolatility: opt.expectedVolatility,
+          rebalanceFrequency: opt.rebalanceFrequency
+        }));
+      }
+      
+      return {
+        horizons: horizons.map(h => parseInt(h)),
+        portfolioTypes: getPortfolioTypes(),
+        options: allOptions
+      };
+    }
+  } catch (error) {
+    console.error('Get curated options error:', error.message);
+    throw error;
+  }
+}
+
+/**
  * Get current buy/hold/sell signals for a portfolio
  * GET /portfolio/:id/signals
  */
@@ -288,58 +678,119 @@ async function getPortfolioStrategy(portfolioId) {
 }
 
 /**
- * Run historical backtest
- * POST /backtest
+ * Run historical backtest on a single stock
+ * POST /backtest/run
+ * Body: { ticker: string, startDate: string, endDate: string, initialCapital: number, strategy: string }
  */
 async function runBacktest(body) {
+  const BacktestEngine = require('../services/BacktestEngine');
+  const PriceDataModel = require('../db/models/PriceDataModel');
+  
   try {
-    const { portfolioId, startDate, endDate, strategy } = body;
+    const { ticker, startDate, endDate, initialCapital, strategy } = body;
     
-    if (!portfolioId) {
-      throw new Error('Portfolio ID is required');
+    // Validate required fields
+    if (!ticker) {
+      throw new Error('Ticker is required');
+    }
+    
+    if (!startDate || !endDate) {
+      throw new Error('Start date and end date are required');
+    }
+    
+    if (!initialCapital || initialCapital <= 0) {
+      throw new Error('Initial capital must be a positive number');
     }
 
-    const portfolio = await DBService.getPortfolio(portfolioId);
-    if (!portfolio) {
-      throw new Error('Portfolio not found');
-    }
-
-    console.log(`Running backtest for portfolio ${portfolioId}`);
+    const tickerUpper = ticker.toUpperCase();
+    console.log(`\n🔄 Running backtest for ${tickerUpper}`);
+    console.log(`   Date range: ${startDate} to ${endDate}`);
+    console.log(`   Initial capital: $${initialCapital.toLocaleString()}`);
+    console.log(`   Strategy: ${strategy}`);
     
-    // This will be implemented in Phase 5 (Backtesting)
-    // For now, return a placeholder
+    // Map frontend strategy names to backend strategy keys
+    const strategyMapping = {
+      'sma_crossover': 'trend_following',
+      'rsi': 'mean_reversion',
+      'macd': 'momentum',
+      'bollinger_bands': 'mean_reversion',
+      'momentum': 'momentum'
+    };
+    
+    const strategyKey = strategyMapping[strategy] || 'trend_following';
+    console.log(`   Mapped strategy: ${strategy} → ${strategyKey}`);
+    
+    // Fetch price data from database only (no API calls)
+    const priceDataDoc = await PriceDataModel.findOne({ ticker: tickerUpper });
+    
+    if (!priceDataDoc || !priceDataDoc.data || priceDataDoc.data.length === 0) {
+      throw new Error(`No price data found in database for ${tickerUpper}. Please ensure the ticker is initialized.`);
+    }
+    
+    console.log(`   Found ${priceDataDoc.data.length} total data points in database`);
+    console.log(`   Database date range: ${priceDataDoc.firstDate} to ${priceDataDoc.lastDate}`);
+    
+    // Filter price data to requested date range
+    let filteredData = priceDataDoc.data.filter(point => {
+      return point.date >= startDate && point.date <= endDate;
+    });
+    
+    // Sort by date ascending
+    filteredData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    if (filteredData.length === 0) {
+      throw new Error(`No price data found for ${tickerUpper} between ${startDate} and ${endDate}. Database has data from ${priceDataDoc.firstDate} to ${priceDataDoc.lastDate}.`);
+    }
+    
+    console.log(`   Filtered to ${filteredData.length} data points for requested range`);
+    
+    // Initialize and run backtest engine
+    const engine = new BacktestEngine({
+      ticker: tickerUpper,
+      priceData: filteredData,
+      strategyKey: strategyKey,
+      initialCapital: parseFloat(initialCapital),
+      positionSizePercent: 50 // Use 50% of cash per trade
+    });
+    
+    const results = await engine.run();
+    
+    // Save backtest session to database
     const sessionId = `backtest_${Date.now()}`;
     await DBService.saveBacktestSession(sessionId, {
-      portfolioId,
-      startDate: startDate || '2020-01-01',
-      endDate: endDate || '2023-12-31',
+      ticker: tickerUpper,
+      startDate: results.startDate,
+      endDate: results.endDate,
+      strategy: strategyKey,
       status: 'completed',
-      metrics: {
-        cagr: 0.12,
-        sharpe: 1.2,
-        maxDrawdown: -0.15,
-        totalReturn: 0.36
-      }
+      metrics: results.metrics
     });
 
+    // Return results in format expected by frontend
     return {
       sessionId,
-      portfolioId,
+      ticker: tickerUpper,
+      strategy: results.strategy,
       period: {
-        start: startDate || '2020-01-01',
-        end: endDate || '2023-12-31'
+        start: results.startDate,
+        end: results.endDate
       },
-      metrics: {
-        cagr: 0.12, // Placeholder
-        sharpe: 1.2, // Placeholder
-        maxDrawdown: -0.15, // Placeholder
-        totalReturn: 0.36 // Placeholder
+      results: {
+        totalReturn: results.metrics.totalReturn,
+        sharpeRatio: results.metrics.sharpeRatio,
+        maxDrawdown: results.metrics.maxDrawdown,
+        winRate: results.metrics.winRate,
+        totalTrades: results.metrics.totalTrades,
+        profitableTrades: results.metrics.profitableTrades,
+        averageReturn: results.metrics.averageReturn,
+        finalValue: results.metrics.finalValue,
+        initialCapital: results.metrics.initialCapital,
+        trades: results.trades
       },
-      message: 'Backtesting will be implemented in Phase 5 - placeholder response',
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    console.error('Backtest error:', error.message);
+    console.error('❌ Backtest error:', error.message);
     throw error;
   }
 }
@@ -1160,7 +1611,13 @@ async function getStockRecommendation(body) {
         const signals = indicator.getAllSignals();
         
         if (!values || (Array.isArray(values) && values.length === 0)) {
-          throw new Error(`Indicator computation returned empty values`);
+          console.warn(`⚠️  ${indicatorConfig.type}(${JSON.stringify(indicatorConfig.params)}) returned empty values - may need more data points`);
+          throw new Error(`Indicator computation returned empty values (need at least ${indicatorConfig.params?.window || 'N'} data points)`);
+        }
+        
+        if (!signals || signals.length === 0) {
+          console.warn(`⚠️  ${indicatorConfig.type}(${JSON.stringify(indicatorConfig.params)}) returned no signals`);
+          throw new Error(`Indicator returned no signals`);
         }
         
         const latestIndex = Array.isArray(values) 
@@ -1182,7 +1639,31 @@ async function getStockRecommendation(body) {
         };
         
         indicatorSignals[indicatorConfig.type] = signals;
-        console.log(`✅ ${indicatorConfig.type}: ${latestSignal} signal calculated successfully`);
+        
+        // Detailed logging for signal verification
+        const signalBreakdown = {
+          buy: signals.filter(s => s === 'buy').length,
+          sell: signals.filter(s => s === 'sell').length,
+          hold: signals.filter(s => s === 'hold').length,
+          total: signals.length
+        };
+        
+        // Get indicator value for context
+        let valueDisplay = 'N/A';
+        if (Array.isArray(values)) {
+          valueDisplay = values.length > 0 ? values[values.length - 1].toFixed(2) : 'N/A';
+        } else if (values && typeof values === 'object') {
+          if (values.macd !== undefined) {
+            const macdVal = Array.isArray(values.macd) ? values.macd[values.macd.length - 1] : values.macd;
+            valueDisplay = typeof macdVal === 'number' ? macdVal.toFixed(2) : 'N/A';
+          } else if (values.upper !== undefined) {
+            const upperVal = Array.isArray(values.upper) ? values.upper[values.upper.length - 1] : values.upper;
+            valueDisplay = typeof upperVal === 'number' ? `Upper:${upperVal.toFixed(2)}` : 'N/A';
+          }
+        }
+        
+        console.log(`✅ ${indicatorConfig.type}: ${latestSignal.toUpperCase()} signal`);
+        console.log(`   Value: ${valueDisplay}, Latest: ${latestSignal}, Breakdown: ${signalBreakdown.buy} buy / ${signalBreakdown.sell} sell / ${signalBreakdown.hold} hold`);
       } catch (error) {
         console.warn(`⚠️  Failed to calculate ${indicatorConfig.type} for ${tickerUpper} (${strategy.name} strategy):`, error.message);
         console.warn(`   Error details:`, error.stack?.substring(0, 200));
@@ -1199,11 +1680,23 @@ async function getStockRecommendation(body) {
     const successfulIndicators = Object.values(indicatorResults).filter(r => !r.error).length;
     const totalIndicators = strategy.indicators.length;
     console.log(`📊 Indicator calculation complete: ${successfulIndicators}/${totalIndicators} successful`);
+    
+    // Log signal breakdown before applying rules
+    const allSignals = Object.values(indicatorSignals).flat();
+    const signalCounts = {
+      buy: allSignals.filter(s => s === 'buy').length,
+      sell: allSignals.filter(s => s === 'sell').length,
+      hold: allSignals.filter(s => s === 'hold').length
+    };
+    console.log(`📊 Signal breakdown across all indicators: ${signalCounts.buy} BUY, ${signalCounts.sell} SELL, ${signalCounts.hold} HOLD`);
 
     // Generate final signal using strategy rules
     const finalSignal = strategy.applyRules(indicatorSignals, priceData);
     const confidence = strategy.calculateConfidence(indicatorSignals, priceData);
     const reason = strategy.generateReason(finalSignal, indicatorSignals);
+    
+    console.log(`🎯 Final recommendation: ${finalSignal.toUpperCase()} (${(confidence * 100).toFixed(0)}% confidence)`);
+    console.log(`   Reasoning: ${reason}`);
 
     // Generate comprehensive recommendation
     const recommendationText = generateRecommendationText(
@@ -1248,11 +1741,9 @@ async function getStockRecommendation(body) {
           riskTolerance,
           strategyName: strategy.name,
           strategyDescription: strategy.getStrategyDescription(),
-          finalRecommendation: finalSignal,
-          confidence: confidence,
-          indicators: indicatorResults,
-          recommendationText,
-          reason
+          indicators: indicatorResults
+          // Removed: finalRecommendation, confidence, recommendationText, reason
+          // This allows Gemini to provide independent analysis without bias
         });
 
         if (geminiInsights && geminiInsights.insights) {
@@ -1268,6 +1759,8 @@ async function getStockRecommendation(body) {
               console.warn(`⚠️  Could not parse insights string:`, parseError.message);
               // Use fallback structure
               insightsObj = {
+                recommendation: 'HOLD',
+                confidence: 0.5,
                 enhancedExplanation: insightsObj,
                 riskAssessment: '',
                 actionableInsights: '',
@@ -1278,14 +1771,65 @@ async function getStockRecommendation(body) {
           
           // Ensure we have the expected structure
           if (typeof insightsObj === 'object' && insightsObj !== null) {
-            baseResponse.geminiInsights = {
-              enhancedExplanation: insightsObj.enhancedExplanation || insightsObj.explanation || '',
-              riskAssessment: insightsObj.riskAssessment || insightsObj.risks || '',
-              actionableInsights: insightsObj.actionableInsights || insightsObj.insights || insightsObj.recommendations || '',
-              educationalContext: insightsObj.educationalContext || insightsObj.context || ''
+            const geminiRecommendation = (insightsObj.recommendation || 'HOLD').toUpperCase();
+            const geminiConfidence = typeof insightsObj.confidence === 'number' ? insightsObj.confidence : 0.5;
+            
+            // Compare Gemini's recommendation with calculated recommendation
+            const recommendationsMatch = geminiRecommendation === finalSignal.toUpperCase();
+            
+            // Helper function to clean up field values (handle JSON strings, markdown code blocks, etc.)
+            const cleanFieldValue = (value) => {
+              if (!value || typeof value !== 'string') return value || '';
+              
+              // Remove markdown code blocks if present
+              let cleaned = value.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+              
+              // If it looks like a JSON object string, try to extract the actual content
+              if (cleaned.startsWith('{') && cleaned.includes('"')) {
+                try {
+                  const parsed = JSON.parse(cleaned);
+                  // If it's a nested object with the same field name, extract the value
+                  if (typeof parsed === 'object' && parsed !== null) {
+                    // Check if it has nested fields that match what we're looking for
+                    if (parsed.enhancedExplanation) return parsed.enhancedExplanation;
+                    if (parsed.explanation) return parsed.explanation;
+                    if (parsed.summary) return parsed.summary;
+                    // If it's just a single field object, return the first string value
+                    const firstStringValue = Object.values(parsed).find(v => typeof v === 'string');
+                    if (firstStringValue) return firstStringValue;
+                  }
+                } catch (e) {
+                  // If parsing fails, continue with cleaned string
+                }
+              }
+              
+              return cleaned;
             };
+            
+            baseResponse.geminiInsights = {
+              recommendation: geminiRecommendation,
+              confidence: geminiConfidence,
+              enhancedExplanation: cleanFieldValue(insightsObj.enhancedExplanation || insightsObj.explanation || ''),
+              riskAssessment: cleanFieldValue(insightsObj.riskAssessment || insightsObj.risks || ''),
+              actionableInsights: cleanFieldValue(insightsObj.actionableInsights || insightsObj.insights || insightsObj.recommendations || ''),
+              educationalContext: cleanFieldValue(insightsObj.educationalContext || insightsObj.context || '')
+            };
+            
+            // Add comparison info
+            baseResponse.recommendationComparison = {
+              calculated: finalSignal.toUpperCase(),
+              calculatedConfidence: confidence,
+              gemini: geminiRecommendation,
+              geminiConfidence: geminiConfidence,
+              match: recommendationsMatch,
+              agreement: recommendationsMatch ? 'Agree' : 'Disagree'
+            };
+            
             baseResponse.geminiEnabled = true;
             console.log(`✅ Gemini insights generated for ${tickerUpper}`);
+            console.log(`   Calculated: ${finalSignal.toUpperCase()} (${(confidence * 100).toFixed(0)}% confidence)`);
+            console.log(`   Gemini: ${geminiRecommendation} (${(geminiConfidence * 100).toFixed(0)}% confidence)`);
+            console.log(`   Agreement: ${recommendationsMatch ? '✅ MATCH' : '⚠️  DISAGREE'}`);
             console.log(`   Enhanced Explanation: ${baseResponse.geminiInsights.enhancedExplanation ? 'Yes (' + baseResponse.geminiInsights.enhancedExplanation.length + ' chars)' : 'No'}`);
             console.log(`   Risk Assessment: ${baseResponse.geminiInsights.riskAssessment ? 'Yes (' + baseResponse.geminiInsights.riskAssessment.length + ' chars)' : 'No'}`);
             console.log(`   Actionable Insights: ${baseResponse.geminiInsights.actionableInsights ? 'Yes (' + baseResponse.geminiInsights.actionableInsights.length + ' chars)' : 'No'}`);
@@ -1494,6 +2038,9 @@ async function getPopularStocks() {
 
 module.exports = {
   initializePortfolio,
+  createCustomPortfolio,
+  createCuratedPortfolio,
+  getCuratedPortfolioOptions,
   getPortfolioSignals,
   getPortfolioStrategy,
   runBacktest,

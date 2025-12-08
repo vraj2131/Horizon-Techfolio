@@ -46,6 +46,109 @@ export interface CreatePortfolioResponse {
   portfolio: Portfolio;
 }
 
+// Curated Portfolio Types
+export interface CuratedPortfolioOption {
+  id: string;
+  name: string;
+  description: string;
+  type: 'growth' | 'balanced' | 'defensive';
+  tickers: string[];
+  riskLevel: string;
+  expectedVolatility: string;
+  rebalanceFrequency: string;
+}
+
+export interface CuratedPortfoliosByHorizon {
+  horizon: number;
+  options: CuratedPortfolioOption[];
+}
+
+export interface CuratedOptionsResponse {
+  horizons?: number[];
+  portfolioTypes?: string[];
+  options?: {
+    '1year': CuratedPortfolioOption[];
+    '2year': CuratedPortfolioOption[];
+    '5year': CuratedPortfolioOption[];
+  };
+  horizon?: number;
+}
+
+export interface CreateCustomPortfolioRequest {
+  userId: string;
+  portfolioName?: string;
+  tickers: string[];
+  horizon: 1 | 2 | 5;
+  initialCapital?: number;
+}
+
+export interface CreateCustomPortfolioResponse {
+  portfolioId: string;
+  userId: string;
+  type: 'custom';
+  name: string;
+  horizon: number;
+  initialCapital: number;
+  cash: number;
+  securities: Security[];
+  positions: {
+    ticker: string;
+    shares: number;
+    avgCost: number;
+    value: number;
+  }[];
+  validationResults: {
+    ticker: string;
+    status: string;
+    note?: string;
+    error?: string;
+  }[];
+  message: string;
+}
+
+export interface CreateCuratedPortfolioRequest {
+  userId: string;
+  horizon: 1 | 2 | 5;
+  portfolioType: 'growth' | 'balanced' | 'defensive';
+  initialCapital: number;
+}
+
+export interface AllocationInfo {
+  ticker: string;
+  shares: number;
+  pricePerShare: number;
+  investedAmount: number;
+  targetAllocation: number;
+  actualAllocation: number;
+}
+
+export interface CreateCuratedPortfolioResponse {
+  portfolioId: string;
+  userId: string;
+  type: 'curated';
+  curatedOption: {
+    id: string;
+    name: string;
+    description: string;
+    type: string;
+    riskLevel: string;
+    rebalanceFrequency: string;
+  };
+  horizon: number;
+  initialCapital: number;
+  totalInvested: number;
+  residualCash: number;
+  allocations: AllocationInfo[];
+  tickerErrors?: { ticker: string; error: string }[];
+  summary: {
+    stocksAllocated: number;
+    totalStocksInPortfolio: number;
+    averageAllocationPerStock: number;
+    investmentEfficiency: number;
+  };
+  message: string;
+}
+
 export interface PortfolioListResponse {
   userId: string;
   portfolios: Portfolio[];

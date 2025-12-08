@@ -95,6 +95,9 @@ async function startServer() {
       console.log(`   Health Check:     http://${HOST}:${PORT}/health`);
       console.log(`\n📚 API Endpoints:`);
       console.log(`   Portfolio:        POST   /portfolio/initialize`);
+      console.log(`                     POST   /portfolio/custom`);
+      console.log(`                     POST   /portfolio/curated`);
+      console.log(`                     GET    /portfolio/curated/options`);
       console.log(`                     GET    /portfolio/:id/signals`);
       console.log(`                     GET    /portfolio/:id/strategy`);
       console.log(`                     GET    /portfolio/:id/performance`);
@@ -120,7 +123,7 @@ async function startServer() {
         console.log('✅ HTTP server closed');
         
         // Stop daily update service
-        if (dailyUpdateService.isRunning && dailyUpdateService.isRunning()) {
+        if (dailyUpdateService.isRunning) {
           console.log('⏰ Stopping daily update service...');
           dailyUpdateService.stop();
           console.log('✅ Daily update service stopped');
@@ -157,8 +160,17 @@ async function startServer() {
 
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-      gracefulShutdown('UNHANDLED_REJECTION');
+      console.error('❌ Unhandled Rejection:', reason);
+      if (reason instanceof Error) {
+        console.error('   Stack:', reason.stack);
+      }
+      // Don't shutdown on unhandled rejections during development
+      // Just log the error to prevent infinite restart loops
+      if (process.env.NODE_ENV === 'production') {
+        gracefulShutdown('UNHANDLED_REJECTION');
+      } else {
+        console.warn('⚠️  Continuing in development mode. Fix the unhandled rejection above.');
+      }
     });
 
   } catch (error) {

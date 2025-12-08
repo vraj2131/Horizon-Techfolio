@@ -3,6 +3,10 @@ import * as portfolioApi from '../api/portfolio';
 import type { 
   Portfolio, 
   CreatePortfolioRequest,
+  CreateCustomPortfolioRequest,
+  CreateCuratedPortfolioRequest,
+  CreateCuratedPortfolioResponse,
+  CuratedOptionsResponse,
   Signal,
   Strategy,
   PerformanceMetrics
@@ -14,6 +18,8 @@ interface PortfolioState {
   signals: Signal[];
   strategy: Strategy | null;
   performance: PerformanceMetrics | null;
+  curatedOptions: CuratedOptionsResponse | null;
+  lastCuratedResult: CreateCuratedPortfolioResponse | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -21,11 +27,15 @@ interface PortfolioState {
 interface PortfolioActions {
   fetchPortfolios: (userId: string) => Promise<void>;
   createPortfolio: (data: CreatePortfolioRequest) => Promise<string>;
+  createCustomPortfolio: (data: CreateCustomPortfolioRequest) => Promise<string>;
+  createCuratedPortfolio: (data: CreateCuratedPortfolioRequest) => Promise<CreateCuratedPortfolioResponse>;
+  fetchCuratedOptions: (horizon?: number) => Promise<void>;
   selectPortfolio: (portfolio: Portfolio) => void;
   fetchPortfolioSignals: (portfolioId: string) => Promise<void>;
   fetchPortfolioStrategy: (portfolioId: string) => Promise<void>;
   fetchPortfolioPerformance: (portfolioId: string) => Promise<void>;
   clearError: () => void;
+  clearLastCuratedResult: () => void;
 }
 
 type PortfolioStore = PortfolioState & PortfolioActions;
@@ -37,6 +47,8 @@ export const usePortfolioStore = create<PortfolioStore>((set) => ({
   signals: [],
   strategy: null,
   performance: null,
+  curatedOptions: null,
+  lastCuratedResult: null,
   isLoading: false,
   error: null,
 
@@ -60,7 +72,7 @@ export const usePortfolioStore = create<PortfolioStore>((set) => ({
     }
   },
 
-  // Create a new portfolio
+  // Create a new portfolio (legacy)
   createPortfolio: async (data: CreatePortfolioRequest) => {
     set({ isLoading: true, error: null });
     
@@ -82,6 +94,75 @@ export const usePortfolioStore = create<PortfolioStore>((set) => ({
       });
       throw error;
     }
+  },
+
+  // Create a custom portfolio
+  createCustomPortfolio: async (data: CreateCustomPortfolioRequest) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      const response = await portfolioApi.createCustomPortfolio(data);
+      
+      // Refresh portfolios list
+      set({ isLoading: false });
+      
+      return response.portfolioId;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to create custom portfolio';
+      set({ 
+        isLoading: false, 
+        error: errorMessage 
+      });
+      throw error;
+    }
+  },
+
+  // Create a curated portfolio with equal-weight allocation
+  createCuratedPortfolio: async (data: CreateCuratedPortfolioRequest) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      const response = await portfolioApi.createCuratedPortfolio(data);
+      
+      set({ 
+        isLoading: false,
+        lastCuratedResult: response
+      });
+      
+      return response;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to create curated portfolio';
+      set({ 
+        isLoading: false, 
+        error: errorMessage 
+      });
+      throw error;
+    }
+  },
+
+  // Fetch curated portfolio options
+  fetchCuratedOptions: async (horizon?: number) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      const response = await portfolioApi.getCuratedPortfolioOptions(horizon);
+      set({
+        curatedOptions: response,
+        isLoading: false
+      });
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch curated options';
+      set({ 
+        isLoading: false, 
+        error: errorMessage 
+      });
+      throw error;
+    }
+  },
+
+  // Clear last curated result
+  clearLastCuratedResult: () => {
+    set({ lastCuratedResult: null });
   },
 
   // Select a portfolio

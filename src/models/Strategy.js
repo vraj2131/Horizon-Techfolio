@@ -143,22 +143,30 @@ class Strategy {
    */
   applyMajorityVote(indicatorSignals) {
     const signalCounts = { buy: 0, hold: 0, sell: 0 };
+    const indicatorVotes = {};
     
     for (const [indicatorType, signals] of Object.entries(indicatorSignals)) {
       if (signals.length > 0) {
         const latestSignal = signals[signals.length - 1];
         signalCounts[latestSignal]++;
+        indicatorVotes[indicatorType] = latestSignal;
       }
     }
+
+    // Log the voting breakdown
+    console.log(`   📊 Strategy voting:`, indicatorVotes);
+    console.log(`   📊 Vote counts: BUY=${signalCounts.buy}, SELL=${signalCounts.sell}, HOLD=${signalCounts.hold}`);
 
     // Return the signal with highest count
     const maxCount = Math.max(...Object.values(signalCounts));
     for (const [signal, count] of Object.entries(signalCounts)) {
       if (count === maxCount) {
+        console.log(`   ✅ Majority vote result: ${signal.toUpperCase()} (${count} indicators agree)`);
         return signal;
       }
     }
 
+    console.log(`   ⚠️  No clear majority, defaulting to HOLD`);
     return 'hold';
   }
 

@@ -8,6 +8,7 @@ const PortfolioModel = require('./models/PortfolioModel');
 const BacktestSessionModel = require('./models/BacktestSessionModel');
 const PaperTradingSessionModel = require('./models/PaperTradingSessionModel');
 const UserModel = require('./models/UserModel');
+const PriceDataModel = require('./models/PriceDataModel');
 const Portfolio = require('../models/Portfolio');
 const Security = require('../models/Security');
 const User = require('../models/User');
@@ -145,50 +146,93 @@ class DBService {
   }
 
   /**
-   * Get all portfolios for a user
+   * Get all portfolios for a user (with current prices fetched from price data)
    */
   static async getUserPortfolios(userId) {
     if (this.useDatabase()) {
       try {
         const portfolioDocs = await PortfolioModel.find({ userId }).sort({ createdAt: -1 });
+        
+        // Fetch current prices for all unique tickers across all portfolios
+        const allTickers = new Set();
+        portfolioDocs.forEach(doc => {
+          (doc.positions || []).forEach(pos => {
+            if (pos.ticker) allTickers.add(pos.ticker);
+          });
+          (doc.securities || []).forEach(sec => {
+            if (sec.ticker) allTickers.add(sec.ticker);
+          });
+        });
+        
+        // Get current prices from price data
+        const currentPrices = new Map();
+        for (const ticker of allTickers) {
+          try {
+            const priceDoc = await PriceDataModel.findOne({ ticker, interval: 'daily' });
+            if (priceDoc && priceDoc.data && priceDoc.data.length > 0) {
+              const latestPrice = priceDoc.data[priceDoc.data.length - 1];
+              if (latestPrice && latestPrice.close) {
+                currentPrices.set(ticker, parseFloat(latestPrice.close));
+              }
+            }
+          } catch (priceError) {
+            console.warn(`Could not fetch price for ${ticker}:`, priceError.message);
+          }
+        }
+        
         return portfolioDocs.map(doc => {
           // Get cash value - prefer saved value, fallback to initialCapital, then default
           let cash = doc.cash;
           if (cash === null || cash === undefined || cash === 0) {
-            // If cash is 0/null, check if we have initialCapital (for portfolios that haven't traded yet)
             if (doc.initialCapital !== null && doc.initialCapital !== undefined && doc.initialCapital > 0) {
-              cash = doc.initialCapital; // Use initialCapital as cash for new portfolios
+              cash = doc.initialCapital;
             } else {
-              // For portfolios created before initialCapital field existed, use default
-              cash = 100000; // Default fallback
+              cash = 100000;
             }
           }
           
-          // Calculate positions value - try multiple fields for compatibility
-          const positionsValue = (doc.positions || []).reduce((sum, pos) => {
-            // Try marketValue first, then calculate from quantity/currentPrice, then shares/currentPrice
-            if (pos.marketValue && pos.marketValue > 0) {
-              return sum + pos.marketValue;
-            }
+          // Enhance positions with current prices and calculate values
+          const enhancedPositions = (doc.positions || []).map(pos => {
+            const ticker = pos.ticker;
             const quantity = pos.quantity || pos.shares || 0;
-            const currentPrice = pos.currentPrice || 0;
-            if (quantity > 0 && currentPrice > 0) {
-              return sum + (quantity * currentPrice);
-            }
-            return sum;
-          }, 0);
+            const avgCost = pos.avg_cost || pos.avgCost || 0;
+            const currentPrice = currentPrices.get(ticker) || avgCost; // Use avg cost as fallback
+            const marketValue = quantity * currentPrice;
+            const costBasis = quantity * avgCost;
+            const pnl = marketValue - costBasis;
+            const pnlPercent = costBasis > 0 ? ((pnl / costBasis) * 100) : 0;
+            
+            return {
+              ticker,
+              quantity,
+              shares: quantity,
+              avgCost,
+              avg_cost: avgCost,
+              currentPrice,
+              marketValue,
+              costBasis,
+              pnl,
+              pnlPercent,
+              side: pos.side || 'long'
+            };
+          });
+          
+          // Calculate total positions value using current prices
+          const positionsValue = enhancedPositions.reduce((sum, pos) => sum + (pos.marketValue || 0), 0);
+          const totalCostBasis = enhancedPositions.reduce((sum, pos) => sum + (pos.costBasis || 0), 0);
           
           // Current value = cash + positions value
           const currentValue = cash + positionsValue;
           
-          // Initial capital: use saved initialCapital if available
-          // For portfolios created before this field existed, use cash as initialCapital
-          // This ensures: if portfolio has $100k cash and no trades, P&L = $0
+          // Initial capital
           let initialCapital = doc.initialCapital;
           if (initialCapital === null || initialCapital === undefined) {
-            // If initialCapital not set, use cash (which should be the starting amount)
-            initialCapital = cash;
+            initialCapital = cash + totalCostBasis; // Cash + what was invested
           }
+          
+          // Total P&L
+          const totalPnL = currentValue - initialCapital;
+          const totalPnLPercent = initialCapital > 0 ? ((totalPnL / initialCapital) * 100) : 0;
           
           return {
             portfolioId: doc.portfolioId,
@@ -196,21 +240,21 @@ class DBService {
             name: doc.name || null,
             horizon: doc.horizon,
             securities: doc.securities || [],
-            positions: doc.positions || [],
+            positions: enhancedPositions,
             cash: cash,
             initialCapital: initialCapital,
             currentValue: currentValue,
+            totalPnL: parseFloat(totalPnL.toFixed(2)),
+            totalPnLPercent: parseFloat(totalPnLPercent.toFixed(2)),
             status: 'active',
             createdAt: doc.createdAt
           };
         });
       } catch (error) {
         console.error('Error loading user portfolios from database:', error.message);
-        // Fallback: return empty array if DB fails
         return [];
       }
     } else {
-      // Memory fallback: would need to track userId in memory storage
       return [];
     }
   }

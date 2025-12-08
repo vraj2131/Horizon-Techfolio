@@ -75,11 +75,7 @@ class GeminiService {
       riskTolerance,
       strategyName,
       strategyDescription,
-      finalRecommendation,
-      confidence,
-      indicators,
-      recommendationText,
-      reason
+      indicators
     } = analysisData;
 
     // Format indicator data for context (this is for the old detailed format, not used in concise prompt)
@@ -216,28 +212,24 @@ class GeminiService {
       horizonContext = 'Long-term (5yr+): Focus on sustained trends and fundamental alignment.';
     }
 
-    const prompt = `Analyze ${ticker} stock recommendation for ${horizon}-year investment horizon using ${strategyName} strategy.
+    const prompt = `Analyze ${ticker} ($${currentPrice.toFixed(2)}) for ${horizon}yr using ${strategyName}.
 
-**Stock Data:**
-Price: $${currentPrice.toFixed(2)}, Strategy: ${strategyName}
-Recommendation: ${finalRecommendation.toUpperCase()} (${(confidence * 100).toFixed(0)}% confidence)
-${strategyContext}
-${horizonContext}
+Strategy: ${strategyContext} ${horizonContext}
+Risk: ${riskTolerance || 'medium'}
 
-**Technical Indicators (${strategyName} strategy uses these):**
-${indicatorSummary || 'No indicators available'}
+Indicators: ${indicatorSummary || 'None'}
 
-**Reasoning:** ${reason.substring(0, 200)}${reason.length > 200 ? '...' : ''}
-
-**Provide concise JSON (2-3 sentences per field, strategy-specific):**
+Provide JSON with BRIEF responses (1-2 sentences max per field, keep total under 200 words):
 {
-  "enhancedExplanation": "Why ${finalRecommendation.toUpperCase()} fits ${strategyName} for ${horizon}yr horizon. Reference specific indicator values.",
-  "riskAssessment": "Risks specific to ${strategyName} strategy and ${horizon}yr timeframe.",
-  "actionableInsights": "Action items for ${horizon}yr investment using ${strategyName} approach.",
-  "educationalContext": "How ${strategyName} indicators support this ${horizon}yr recommendation."
+  "recommendation": "BUY/HOLD/SELL",
+  "confidence": 0.0-1.0,
+  "enhancedExplanation": "Brief ${horizon}yr ${strategyName} explanation. Reference indicator values.",
+  "riskAssessment": "Brief ${strategyName} risks for ${horizon}yr.",
+  "actionableInsights": "Brief ${horizon}yr actions.",
+  "educationalContext": "Brief ${strategyName} indicator context."
 }
 
-Be concise. Focus on ${strategyName} strategy and ${horizon}-year horizon.`;
+Keep responses SHORT and CONCISE. Maximum 2 sentences per field.`;
 
     return prompt;
   }
@@ -263,7 +255,7 @@ Be concise. Focus on ${strategyName} strategy and ${horizon}-year horizon.`;
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 1500, // Sufficient for concise responses
+        maxOutputTokens: 1600, // Reduced to force concise responses
       },
       safetySettings: [
         {
@@ -352,10 +344,18 @@ Be concise. Focus on ${strategyName} strategy and ${horizon}-year horizon.`;
       // Check finish reason
       if (candidate.finishReason === 'MAX_TOKENS') {
         console.warn(`⚠️  Response was truncated due to MAX_TOKENS limit`);
+        // Continue to try to extract partial response if available
       }
       
       // Check if content has parts - if not, the response might be empty or malformed
-      if (!candidate.content.parts || !Array.isArray(candidate.content.parts) || candidate.content.parts.length === 0) {
+      if (!candidate.content || !candidate.content.parts || !Array.isArray(candidate.content.parts) || candidate.content.parts.length === 0) {
+        // If MAX_TOKENS and no content, provide a helpful error
+        if (candidate.finishReason === 'MAX_TOKENS') {
+          console.error(`❌ Response hit MAX_TOKENS limit before generating any content`);
+          console.error(`   Prompt length: ${prompt.length} characters`);
+          console.error(`   Try reducing prompt complexity or increasing maxOutputTokens`);
+          throw new Error('Gemini response hit token limit before generating content. Try a simpler prompt or increase maxOutputTokens.');
+        }
         console.error(`❌ Content has no parts array or parts is empty`);
         console.error(`❌ Full content object:`, JSON.stringify(candidate.content, null, 2));
         console.error(`❌ Full candidate:`, JSON.stringify(candidate, null, 2));
@@ -450,19 +450,72 @@ Be concise. Focus on ${strategyName} strategy and ${horizon}-year horizon.`;
           throw new Error('Parsed response is not an object');
         }
         
+        // Helper function to clean field values (remove JSON formatting, markdown, etc.)
+        const cleanFieldValue = (value) => {
+          if (!value) return '';
+          if (typeof value !== 'string') return String(value);
+          
+          // Remove markdown code blocks
+          let cleaned = value.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+          
+          // If it's a JSON string, try to parse and extract content
+          if (cleaned.startsWith('{') && cleaned.includes('"')) {
+            try {
+              const parsed = JSON.parse(cleaned);
+              if (typeof parsed === 'object' && parsed !== null) {
+                // If it has nested fields, extract the text content
+                if (parsed.enhancedExplanation) return parsed.enhancedExplanation;
+                if (parsed.explanation) return parsed.explanation;
+                if (parsed.summary) return parsed.summary;
+                // Return first string value found
+                const firstString = Object.values(parsed).find(v => typeof v === 'string' && v.length > 0);
+                if (firstString) return firstString;
+              }
+            } catch (e) {
+              // If parsing fails, continue with cleaned string
+            }
+          }
+          
+          return cleaned;
+        };
+        
         // Ensure we have at least one of the expected fields
-        const expectedFields = ['enhancedExplanation', 'riskAssessment', 'actionableInsights', 'educationalContext'];
+        const expectedFields = ['recommendation', 'enhancedExplanation', 'riskAssessment', 'actionableInsights', 'educationalContext'];
         const hasExpectedField = expectedFields.some(field => parsedResponse[field]);
         
         if (!hasExpectedField) {
           console.warn(`⚠️  Parsed JSON doesn't have expected fields, using fallback`);
           // If the structure is different, try to map it
           parsedResponse = {
-            enhancedExplanation: parsedResponse.enhancedExplanation || parsedResponse.explanation || parsedResponse.summary || text,
-            riskAssessment: parsedResponse.riskAssessment || parsedResponse.risks || '',
-            actionableInsights: parsedResponse.actionableInsights || parsedResponse.insights || parsedResponse.recommendations || '',
-            educationalContext: parsedResponse.educationalContext || parsedResponse.context || ''
+            recommendation: parsedResponse.recommendation || parsedResponse.signal || 'HOLD',
+            confidence: parsedResponse.confidence || parsedResponse.confidenceLevel || 0.5,
+            enhancedExplanation: cleanFieldValue(parsedResponse.enhancedExplanation || parsedResponse.explanation || parsedResponse.summary || text),
+            riskAssessment: cleanFieldValue(parsedResponse.riskAssessment || parsedResponse.risks || ''),
+            actionableInsights: cleanFieldValue(parsedResponse.actionableInsights || parsedResponse.insights || parsedResponse.recommendations || ''),
+            educationalContext: cleanFieldValue(parsedResponse.educationalContext || parsedResponse.context || '')
           };
+        } else {
+          // Ensure recommendation and confidence are present
+          if (!parsedResponse.recommendation) {
+            parsedResponse.recommendation = 'HOLD';
+          }
+          if (parsedResponse.confidence === undefined || parsedResponse.confidence === null) {
+            parsedResponse.confidence = 0.5;
+          }
+          
+          // Clean all text fields to remove any JSON formatting
+          if (parsedResponse.enhancedExplanation) {
+            parsedResponse.enhancedExplanation = cleanFieldValue(parsedResponse.enhancedExplanation);
+          }
+          if (parsedResponse.riskAssessment) {
+            parsedResponse.riskAssessment = cleanFieldValue(parsedResponse.riskAssessment);
+          }
+          if (parsedResponse.actionableInsights) {
+            parsedResponse.actionableInsights = cleanFieldValue(parsedResponse.actionableInsights);
+          }
+          if (parsedResponse.educationalContext) {
+            parsedResponse.educationalContext = cleanFieldValue(parsedResponse.educationalContext);
+          }
         }
         
       } catch (parseError) {
@@ -470,6 +523,8 @@ Be concise. Focus on ${strategyName} strategy and ${horizon}-year horizon.`;
         console.warn(`⚠️  Raw text:`, text.substring(0, 300));
         // If not JSON, wrap in a structured format
         parsedResponse = {
+          recommendation: 'HOLD',
+          confidence: 0.5,
           enhancedExplanation: text,
           riskAssessment: '',
           actionableInsights: '',
@@ -478,7 +533,10 @@ Be concise. Focus on ${strategyName} strategy and ${horizon}-year horizon.`;
       }
 
       console.log(`✅ Successfully parsed Gemini response with fields:`, Object.keys(parsedResponse).join(', '));
+      console.log(`✅ Gemini's independent recommendation: ${parsedResponse.recommendation} (confidence: ${parsedResponse.confidence})`);
       console.log(`✅ Field lengths:`, {
+        recommendation: parsedResponse.recommendation?.length || 0,
+        confidence: parsedResponse.confidence || 0,
         enhancedExplanation: parsedResponse.enhancedExplanation?.length || 0,
         riskAssessment: parsedResponse.riskAssessment?.length || 0,
         actionableInsights: parsedResponse.actionableInsights?.length || 0,

@@ -67,10 +67,38 @@ apiClient.interceptors.response.use(
 
     // Log errors in development
     if (process.env.NODE_ENV !== 'production') {
-      if (error.response?.status === 429) {
+      const status = error.response?.status;
+      
+      if (status === 429) {
         console.warn('Rate limit exceeded:', error.response?.data);
-      } else if (error.response?.status >= 500) {
-        console.error('Server error:', error.response?.data);
+      } else if (status && status >= 500) {
+        const errorData = error.response?.data;
+        const errorMessage = 
+          (typeof errorData === 'object' && errorData !== null && !Array.isArray(errorData))
+            ? ((errorData as any).error || (errorData as any).message || JSON.stringify(errorData))
+            : (errorData || error.message || 'Unknown server error');
+        console.error('Server error:', {
+          status: status,
+          statusText: error.response?.statusText,
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          message: errorMessage,
+          data: errorData
+        });
+      } else if (status && status >= 400) {
+        // Log client errors (4xx) too, but as warnings
+        const errorData = error.response?.data;
+        const errorMessage = 
+          (typeof errorData === 'object' && errorData !== null && !Array.isArray(errorData))
+            ? ((errorData as any).error || (errorData as any).message || JSON.stringify(errorData))
+            : (errorData || error.message || 'Request failed');
+        console.warn('Client error:', {
+          status: status,
+          statusText: error.response?.statusText,
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          message: errorMessage
+        });
       }
     }
 
