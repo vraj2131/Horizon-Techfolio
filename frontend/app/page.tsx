@@ -18,7 +18,7 @@ import {
   Zap,
   ArrowDown
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -95,7 +95,7 @@ export default function LandingPage() {
     }
   ];
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -105,7 +105,7 @@ export default function LandingPage() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
@@ -205,10 +205,10 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.8 }}
           >
-            Horizon isn't just another trading platform. We don't just give you signals—we{' '}
+            Horizon isn't just another trading platform. We don't just give signals—we{' '}
             <span className="text-green-400 font-semibold relative">
               <span className="absolute inset-0 bg-green-500/20 blur-xl"></span>
-              <span className="relative">teach you how technical indicators work</span>
+              <span className="relative">teach how technical indicators work</span>
             </span>
             {', '}
             provide{' '}
@@ -221,7 +221,7 @@ export default function LandingPage() {
               <span className="absolute inset-0 bg-purple-500/20 blur-xl"></span>
               <span className="relative">strategy backtesting</span>
             </span>
-            {' '}to help you become a smarter investor.
+            {' '}to make you a smarter investor.
           </motion.p>
 
           <motion.div 

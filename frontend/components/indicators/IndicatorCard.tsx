@@ -39,9 +39,13 @@ export interface IndicatorData {
     prices: number[];
     window: number;
     values: number[];
+    upperBandValue?: number;
+    lowerBandValue?: number;
     currentPrice: number;
     currentValue: number;
     signal: 'buy' | 'sell' | 'hold';
+    signalLineValue?: number;
+    histogramValue?: number;
   };
   tips: string[];
 }
@@ -71,9 +75,9 @@ export function IndicatorCard({ indicator, onShowCalculator, showCalculator }: I
 
   const getSignalBadge = (signal: string) => {
     switch (signal) {
-      case 'buy': return <Badge variant="success">BUY</Badge>;
-      case 'sell': return <Badge variant="error">SELL</Badge>;
-      default: return <Badge variant="info">HOLD</Badge>;
+      case 'buy': return <Badge variant="buy">BUY</Badge>;
+      case 'sell': return <Badge variant="sell">SELL</Badge>;
+      default: return <Badge variant="hold">HOLD</Badge>;
     }
   };
 

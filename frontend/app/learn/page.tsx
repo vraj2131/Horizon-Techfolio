@@ -93,7 +93,7 @@ const indicators: IndicatorData[] = [
       values: [45, 48, 52, 55, 58, 62, 65, 68, 72, 75, 78, 68, 65, 70, 72],
       currentPrice: 173,
       currentValue: 72,
-      signal: 'hold'
+      signal: 'sell'
     },
     tips: [
       'RSI above 70 = overbought (potential sell, but can stay high in strong trends)',
@@ -118,9 +118,11 @@ const indicators: IndicatorData[] = [
     example: {
       prices: [150, 152, 151, 153, 154, 155, 153, 156, 158, 157, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 170, 171, 169, 172, 173],
       window: 26,
-      values: [1.2, 1.5, 1.8, 2.1, 2.4, 2.7],
+      values: [1.2, 1.5, 1.8, 2.1, 2.4, 2.7], // MACD line (example)
       currentPrice: 173,
-      currentValue: 2.7,
+      currentValue: 2.7, // MACD line (latest)
+      signalLineValue: 2.3, // Signal line (example)
+      histogramValue: 0.4, // MACD - signal
       signal: 'buy'
     },
     tips: [
@@ -146,9 +148,11 @@ const indicators: IndicatorData[] = [
     example: {
       prices: [150, 152, 151, 153, 154, 155, 153, 156, 158, 157, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 170, 171, 169, 172, 173],
       window: 20,
-      values: [158.5, 159.2, 159.8, 160.4, 161.1, 161.7],
+      values: [158.5, 159.2, 159.8, 160.4, 161.1, 161.7], // middle band (SMA) example
+      upperBandValue: 179.5,
+      lowerBandValue: 143.9,
       currentPrice: 173,
-      currentValue: 161.7,
+      currentValue: 161.7, // middle band latest
       signal: 'hold'
     },
     tips: [
@@ -208,9 +212,9 @@ export default function LearnIndicatorsPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-16">
         {/* Hero Section */}
-        <GlassCard className="mb-8 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20">
+        <GlassCard className="mb-10 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20">
           <div className="flex items-start gap-4">
             <div className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl">
               <Brain className="w-8 h-8 text-blue-400" />

@@ -168,11 +168,21 @@ class DBService {
         const currentPrices = new Map();
         for (const ticker of allTickers) {
           try {
-            const priceDoc = await PriceDataModel.findOne({ ticker, interval: 'daily' });
+            // Try both uppercase and original case
+            const tickerUpper = ticker.toUpperCase();
+            let priceDoc = await PriceDataModel.findOne({ ticker: tickerUpper, interval: 'daily' });
+            if (!priceDoc) {
+              priceDoc = await PriceDataModel.findOne({ ticker: ticker, interval: 'daily' });
+            }
             if (priceDoc && priceDoc.data && priceDoc.data.length > 0) {
               const latestPrice = priceDoc.data[priceDoc.data.length - 1];
               if (latestPrice && latestPrice.close) {
-                currentPrices.set(ticker, parseFloat(latestPrice.close));
+                const price = parseFloat(latestPrice.close);
+                if (!isNaN(price) && price > 0) {
+                  // Store with both uppercase and original case for lookup
+                  currentPrices.set(tickerUpper, price);
+                  currentPrices.set(ticker, price);
+                }
               }
             }
           } catch (priceError) {
@@ -194,13 +204,31 @@ class DBService {
           // Enhance positions with current prices and calculate values
           const enhancedPositions = (doc.positions || []).map(pos => {
             const ticker = pos.ticker;
+            const tickerUpper = ticker ? ticker.toUpperCase() : '';
             const quantity = pos.quantity || pos.shares || 0;
             const avgCost = pos.avg_cost || pos.avgCost || 0;
-            const currentPrice = currentPrices.get(ticker) || avgCost; // Use avg cost as fallback
+            // Try to get price with both uppercase and original case
+            let currentPrice = currentPrices.get(ticker) || currentPrices.get(tickerUpper);
+            
+            // If price not found, log warning but don't use avgCost (which makes P&L always 0)
+            if (currentPrice === undefined && quantity > 0) {
+              console.warn(`⚠️  No current price found for ${ticker} (tried ${ticker} and ${tickerUpper}), using last known price or 0`);
+              // Don't use avgCost as fallback - that makes P&L always show $0.00
+              // Instead, try to get from position data or use 0
+              currentPrice = pos.currentPrice || 0;
+            } else if (currentPrice === undefined) {
+              currentPrice = 0;
+            }
+            
             const marketValue = quantity * currentPrice;
             const costBasis = quantity * avgCost;
             const pnl = marketValue - costBasis;
             const pnlPercent = costBasis > 0 ? ((pnl / costBasis) * 100) : 0;
+            
+            // Debug log for positions with unexpected P&L
+            if (quantity > 0 && avgCost > 0 && currentPrice > 0 && Math.abs(pnl) < 0.01) {
+              console.log(`🔍 ${ticker}: qty=${quantity}, avgCost=${avgCost.toFixed(2)}, currentPrice=${currentPrice.toFixed(2)}, pnl=${pnl.toFixed(2)}`);
+            }
             
             return {
               ticker,
@@ -213,6 +241,9 @@ class DBService {
               costBasis,
               pnl,
               pnlPercent,
+              // Aliases for frontend fields
+              profitLoss: pnl,
+              profitLossPercent: pnlPercent,
               side: pos.side || 'long'
             };
           });

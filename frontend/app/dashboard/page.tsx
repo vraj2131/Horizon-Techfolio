@@ -184,7 +184,10 @@ export default function DashboardPage() {
           </GlassCard>
 
           {/* Holdings Value */}
-          <GlassCard className="p-6">
+          <GlassCard 
+            className="p-6 cursor-pointer hover:bg-slate-800/50 transition-colors"
+            onClick={() => router.push('/trading')}
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 bg-purple-500/10 rounded-xl">
                 <DollarSign className="w-6 h-6 text-purple-400" />
@@ -207,9 +210,12 @@ export default function DashboardPage() {
                 {totalHoldingsPnL >= 0 ? '+' : ''}{formatCurrency(totalHoldingsPnL)}
               </p>
             </div>
-            <p className="text-xs text-slate-500 mt-2">
-              {holdings?.length || 0} position{holdings?.length !== 1 ? 's' : ''}
-            </p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-slate-500">
+                {holdings?.length || 0} position{holdings?.length !== 1 ? 's' : ''}
+              </p>
+              <ArrowRight className="w-4 h-4 text-slate-400" />
+            </div>
           </GlassCard>
 
           {/* Active Portfolios */}

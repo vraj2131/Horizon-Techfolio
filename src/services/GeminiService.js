@@ -219,7 +219,7 @@ Risk: ${riskTolerance || 'medium'}
 
 Indicators: ${indicatorSummary || 'None'}
 
-Provide JSON with BRIEF responses (1-2 sentences max per field, keep total under 200 words):
+Respond ONLY with raw JSON (no markdown, no code fences, no extra text). Keep each field to 1-2 sentences max, total under 200 words. Schema:
 {
   "recommendation": "BUY/HOLD/SELL",
   "confidence": 0.0-1.0,
@@ -229,7 +229,7 @@ Provide JSON with BRIEF responses (1-2 sentences max per field, keep total under
   "educationalContext": "Brief ${strategyName} indicator context."
 }
 
-Keep responses SHORT and CONCISE. Maximum 2 sentences per field.`;
+Keep responses SHORT and CONCISE. Maximum 2 sentences per field. Do not wrap in markdown or prose.`;
 
     return prompt;
   }
@@ -256,6 +256,7 @@ Keep responses SHORT and CONCISE. Maximum 2 sentences per field.`;
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 1600, // Reduced to force concise responses
+        stopSequences: ["```"] // Prevent code fences in output
       },
       safetySettings: [
         {
@@ -420,25 +421,28 @@ Keep responses SHORT and CONCISE. Maximum 2 sentences per field.`;
       
       // Try to parse as JSON, fallback to plain text
       let parsedResponse;
+      let normalizedText = text;
       try {
-        // First, try to extract JSON from markdown code blocks if present
-        const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+        // Normalize by stripping any code fences up front
+        normalizedText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+        // First, try to extract JSON from markdown code blocks if present (after normalization)
+        const jsonMatch = normalizedText.match(/(\{[\s\S]*\})/);
         if (jsonMatch && jsonMatch[1]) {
           parsedResponse = JSON.parse(jsonMatch[1]);
-          console.log(`✅ Parsed JSON from markdown code block`);
+          console.log(`✅ Parsed JSON from cleaned text/code block`);
         } else {
-          // Try to parse the entire text as JSON
-          // Sometimes Gemini returns JSON directly without markdown
-          const trimmedText = text.trim();
+          // Try to parse the entire normalized text as JSON
+          const trimmedText = normalizedText.trim();
           if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
             parsedResponse = JSON.parse(trimmedText);
-            console.log(`✅ Parsed JSON directly from text`);
+            console.log(`✅ Parsed JSON directly from cleaned text`);
           } else {
             // Try to find JSON object in the text
             const jsonObjectMatch = trimmedText.match(/\{[\s\S]*\}/);
             if (jsonObjectMatch) {
               parsedResponse = JSON.parse(jsonObjectMatch[0]);
-              console.log(`✅ Extracted and parsed JSON object from text`);
+              console.log(`✅ Extracted and parsed JSON object from cleaned text`);
             } else {
               throw new Error('No JSON object found in response');
             }
@@ -522,10 +526,11 @@ Keep responses SHORT and CONCISE. Maximum 2 sentences per field.`;
         console.warn(`⚠️  Could not parse as JSON:`, parseError.message);
         console.warn(`⚠️  Raw text:`, text.substring(0, 300));
         // If not JSON, wrap in a structured format
+        const fallbackClean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
         parsedResponse = {
           recommendation: 'HOLD',
           confidence: 0.5,
-          enhancedExplanation: text,
+          enhancedExplanation: fallbackClean,
           riskAssessment: '',
           actionableInsights: '',
           educationalContext: ''

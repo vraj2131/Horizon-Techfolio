@@ -53,7 +53,7 @@ export function InteractiveCalculator({ indicator }: InteractiveCalculatorProps)
   const getSignalBadge = (signal: string) => {
     switch (signal) {
       case 'buy': return <Badge variant="success">BUY</Badge>;
-      case 'sell': return <Badge variant="error">SELL</Badge>;
+      case 'sell': return <Badge variant="sell">SELL</Badge>;
       default: return <Badge variant="info">HOLD</Badge>;
     }
   };
@@ -68,8 +68,20 @@ export function InteractiveCalculator({ indicator }: InteractiveCalculatorProps)
   }
 
   const latestValue = calculatedValues[calculatedValues.length - 1];
+  const isMacd = indicator.id === 'macd';
+  const isRsi = indicator.id === 'rsi';
+  const isBollinger = indicator.id === 'bollinger';
+  const macdValue = isMacd ? indicator.example.currentValue : latestValue;
+  const signalLineValue = isMacd ? (indicator.example as any).signalLineValue ?? macdValue : undefined;
+  const histogramValue = isMacd && signalLineValue !== undefined ? macdValue - signalLineValue : undefined;
   const priceDifference = indicator.example.currentPrice - latestValue;
   const percentDifference = ((priceDifference / latestValue) * 100).toFixed(1);
+
+  const formatValue = (value: number) => {
+    if (isMacd) return value.toFixed(2);
+    if (isRsi) return value.toFixed(2);
+    return `$${value.toFixed(2)}`;
+  };
 
   return (
     <GlassCard className="mt-6">
@@ -92,7 +104,7 @@ export function InteractiveCalculator({ indicator }: InteractiveCalculatorProps)
 
       <div className="space-y-4">
         {/* Step 1: Show prices */}
-        <div className={step >= 0 ? 'opacity-100' : 'opacity-50'}>
+        <div className={step >= 0 ? 'opacity-100' : 'opacity-30 blur-[1px]'}>
           <div className="flex items-center gap-2 mb-2">
             <span className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-sm text-blue-400 font-bold">
               1
@@ -113,7 +125,7 @@ export function InteractiveCalculator({ indicator }: InteractiveCalculatorProps)
         </div>
 
         {/* Step 2: Show calculation */}
-        <div className={step >= 1 ? 'opacity-100' : 'opacity-50'}>
+        <div className={step >= 1 ? 'opacity-100' : 'opacity-30 blur-[1px]'}>
           <div className="flex items-center gap-2 mb-2">
             <span className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-sm text-blue-400 font-bold">
               2
@@ -144,7 +156,7 @@ export function InteractiveCalculator({ indicator }: InteractiveCalculatorProps)
         </div>
 
         {/* Step 3: Show result */}
-        <div className={step >= 2 ? 'opacity-100' : 'opacity-50'}>
+        <div className={step >= 2 ? 'opacity-100' : 'opacity-30 blur-[1px]'}>
           <div className="flex items-center gap-2 mb-2">
             <span className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-sm text-blue-400 font-bold">
               3
@@ -154,13 +166,62 @@ export function InteractiveCalculator({ indicator }: InteractiveCalculatorProps)
           <div className="ml-8 p-4 bg-slate-800/50 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Latest {indicator.shortName}</p>
-                <p className="text-2xl font-bold text-white">${latestValue.toFixed(2)}</p>
+                <p className="text-sm text-slate-400">
+                  {isMacd ? 'MACD Line' : `Latest ${indicator.shortName}`}
+                </p>
+                <p className="text-2xl font-bold text-white">
+                  {formatValue(isMacd ? macdValue : latestValue)}
+                </p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-slate-400">Current Price</p>
-                <p className="text-2xl font-bold text-white">${indicator.example.currentPrice.toFixed(2)}</p>
-              </div>
+              {isMacd ? (
+                <div className="text-right space-y-1">
+                  <div>
+                    <p className="text-sm text-slate-400">Signal Line</p>
+                    <p className="text-xl font-bold text-white">
+                      {signalLineValue !== undefined ? signalLineValue.toFixed(2) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-400">Histogram (MACD - Signal)</p>
+                    <p className="text-xl font-bold text-white">
+                      {histogramValue !== undefined ? histogramValue.toFixed(2) : '—'}
+                    </p>
+                  </div>
+                </div>
+              ) : isRsi ? (
+                <div className="text-right space-y-1">
+                  <div>
+                    <p className="text-sm text-slate-400">Overbought</p>
+                    <p className="text-xl font-bold text-white">70</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-400">Oversold</p>
+                    <p className="text-xl font-bold text-white">30</p>
+                  </div>
+                </div>
+              ) : isBollinger ? (
+                <div className="text-right space-y-1">
+                  <div>
+                    <p className="text-sm text-slate-400">Upper Band</p>
+                    <p className="text-xl font-bold text-white">
+                      {indicator.example.upperBandValue !== undefined ? `$${indicator.example.upperBandValue.toFixed(2)}` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-400">Lower Band</p>
+                    <p className="text-xl font-bold text-white">
+                      {indicator.example.lowerBandValue !== undefined ? `$${indicator.example.lowerBandValue.toFixed(2)}` : '—'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <p className="text-sm text-slate-400">Current Price</p>
+                  <p className="text-2xl font-bold text-white">
+                    ${indicator.example.currentPrice.toFixed(2)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -191,12 +252,62 @@ export function InteractiveCalculator({ indicator }: InteractiveCalculatorProps)
                 </div>
                 {getSignalBadge(indicator.example.signal)}
               </div>
-              <p className="text-sm text-slate-300">
-                Price is <span className="font-semibold text-white">{percentDifference}%</span> {priceDifference > 0 ? 'above' : 'below'} the {indicator.shortName}
-              </p>
-              <p className="text-sm text-slate-400 mt-2">
-                {indicator.signals[indicator.example.signal]}
-              </p>
+              {isMacd ? (
+                <>
+                  <p className="text-sm text-slate-300">
+                    MACD line is{' '}
+                    <span className="font-semibold text-white">
+                      {signalLineValue !== undefined
+                        ? `${(macdValue - signalLineValue).toFixed(2)}`
+                        : '—'}
+                    </span>{' '}
+                    {signalLineValue !== undefined && macdValue >= signalLineValue ? 'above' : 'below'} the signal line.
+                  </p>
+                  {histogramValue !== undefined && (
+                    <p className="text-sm text-slate-400 mt-2">
+                      Histogram (MACD - Signal): {histogramValue.toFixed(2)}. Positive = bullish momentum, negative = bearish momentum.
+                    </p>
+                  )}
+                  <p className="text-sm text-slate-400 mt-2">
+                    {indicator.signals[indicator.example.signal]}
+                  </p>
+                </>
+              ) : isRsi ? (
+                <>
+                  <p className="text-sm text-slate-300">
+                    RSI is{' '}
+                    <span className="font-semibold text-white">{formatValue(latestValue)}</span>{' '}
+                    (0–100 scale).
+                  </p>
+                  <p className="text-sm text-slate-400 mt-2">
+                    Overbought threshold: 70 | Oversold threshold: 30.
+                  </p>
+                  <p className="text-sm text-slate-400 mt-2">
+                    {indicator.signals[indicator.example.signal]}
+                  </p>
+                </>
+              ) : isBollinger ? (
+                <>
+                  <p className="text-sm text-slate-300">
+                    Price: <span className="font-semibold text-white">${indicator.example.currentPrice.toFixed(2)}</span>
+                  </p>
+                  <p className="text-sm text-slate-400 mt-2">
+                    Upper band: {indicator.example.upperBandValue !== undefined ? `$${indicator.example.upperBandValue.toFixed(2)}` : '—'} | Lower band: {indicator.example.lowerBandValue !== undefined ? `$${indicator.example.lowerBandValue.toFixed(2)}` : '—'}.
+                  </p>
+                  <p className="text-sm text-slate-400 mt-2">
+                    {indicator.signals[indicator.example.signal]}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-300">
+                    Price is <span className="font-semibold text-white">{percentDifference}%</span> {priceDifference > 0 ? 'above' : 'below'} the {indicator.shortName}
+                  </p>
+                  <p className="text-sm text-slate-400 mt-2">
+                    {indicator.signals[indicator.example.signal]}
+                  </p>
+                </>
+              )}
             </div>
           </motion.div>
         )}
