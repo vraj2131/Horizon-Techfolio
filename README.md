@@ -242,7 +242,7 @@ MIT License
 ## 🤝 Contributing
 
 This is a course project. For questions or issues, please contact:
-- **Email**: ayush.dodia@rutgers.edu
+- **Email**: vrajshah53@gmail.com
 
 ---
 
